@@ -1,0 +1,248 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #1a1a1c;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+  color: #d1d1d1;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== UNIFIED CONTROL BAR (Helium style - todo en una línea) ===== */
+#control-bar {
+  background: #2a2a2e;
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  gap: 4px;
+  height: 38px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Navigation buttons */
+#control-bar button {
+  background: transparent;
+  border: none;
+  color: #8a8a8a;
+  font-size: 14px;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s ease;
+  flex-shrink: 0;
+}
+
+#control-bar button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #d1d1d1;
+}
+
+#control-bar button:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+#control-bar button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* URL Bar */
+#url-bar {
+  flex: 1;
+  background: #1a1a1c;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #d1d1d1;
+  padding: 0 12px;
+  height: 28px;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.12s ease;
+  min-width: 200px;
+}
+
+#url-bar:focus {
+  border-color: rgba(100, 150, 255, 0.5);
+  background: #18181a;
+}
+
+#url-bar::placeholder {
+  color: #5a5a5a;
+}
+
+/* Tabs container */
+#tabs-container {
+  display: flex;
+  gap: 1px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-left: 8px;
+}
+
+#tabs-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Individual tab */
+.tab {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding: 4px 8px;
+  gap: 6px;
+  cursor: pointer;
+  min-width: 60px;
+  max-width: 140px;
+  transition: all 0.1s ease;
+  height: 26px;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tab.active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tab-favicon {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.tab-title {
+  flex: 1;
+  color: #9a9a9a;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab.active .tab-title {
+  color: #d1d1d1;
+}
+
+.tab-close {
+  background: transparent;
+  border: none;
+  color: #6a6a6a;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.1s ease;
+}
+
+.tab:hover .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #d1d1d1;
+}
+
+/* New tab button */
+#btn-new-tab {
+  background: transparent;
+  border: none;
+  color: #6a6a6a;
+  font-size: 16px;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s ease;
+  flex-shrink: 0;
+}
+
+#btn-new-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #d1d1d1;
+}
+
+/* ===== PROGRESS BAR ===== */
+#progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #5a8dff, #8ab4ff);
+  width: 0%;
+  z-index: 9999;
+  transition: width 0.15s ease-out;
+}
+
+#progress-bar.loading {
+  animation: progress-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes progress-pulse {
+  0% {
+    width: 0%;
+  }
+
+  50% {
+    width: 70%;
+  }
+
+  100% {
+    width: 90%;
+  }
+}
+
+#progress-bar.complete {
+  width: 100%;
+  opacity: 0;
+  transition: width 0.1s, opacity 0.15s 0.1s;
+}
+
+/* ===== LOADING ANIMATION ===== */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading {
+  animation: spin 0.7s linear infinite;
+  color: #5a8dff !important;
+}
+
+/* Hidden go button */
+#btn-go {
+  display: none;
+}
+
+/* Favicon in URL bar */
+#favicon {
+  display: none;
+}

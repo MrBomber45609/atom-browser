@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atom</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <!-- Barra de progreso -->
+  <div id="progress-bar"></div>
+
+  <!-- Barra de control unificada (estilo Helium) -->
+  <div id="control-bar">
+    <button id="btn-back" title="Atrás">‹</button>
+    <button id="btn-forward" title="Adelante">›</button>
+    <button id="btn-refresh" title="Recargar">↻</button>
+
+    <input type="text" id="url-bar" placeholder="Buscar o escribir URL" autocomplete="off">
+
+    <div id="tabs-container"></div>
+    <button id="btn-new-tab" title="Nueva pestaña">+</button>
+  </div>
+
+  <img id="favicon" src="" alt="" style="display:none" />
+  <button id="btn-go" style="display:none">Ir</button>
+
+  <script src="main.js"></script>
+</body>
+
+</html>
