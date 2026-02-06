@@ -1,0 +1,491 @@
+================================================================================
+                    ATOM SHIELD v9 "Mock Masters" - CÓDIGO COMPLETO
+================================================================================
+
+(function() {
+    console.log("🛡️ Atom Shield v9: Mock Masters Edition");
+
+    // ========================================
+    // 0. MOCK OBJECTS (Engaña los tests de ejecución)
+    // ========================================
+    
+    // Google Analytics (ga, gtag, dataLayer)
+    window.ga = window.ga || function() { 
+        console.log("🎭 Mock GA llamado"); 
+        return { loaded: true };
+    };
+    window.ga.l = Date.now();
+    window.ga.q = [];
+    window.ga.getAll = function() { return []; };
+    window.ga.getByName = function() { return null; };
+    window.ga.create = function() { return {}; };
+    window.ga.remove = function() {};
+    
+    window.gtag = window.gtag || function() { 
+        console.log("🎭 Mock gtag llamado"); 
+    };
+    
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push = function() { 
+        console.log("🎭 Mock dataLayer.push"); 
+        return 0; 
+    };
+    
+    // Google Tag Manager
+    window.google_tag_manager = window.google_tag_manager || {};
+
+    // Hotjar
+    window.hj = window.hj || function() { 
+        console.log("🎭 Mock Hotjar llamado"); 
+    };
+    window.hj.q = [];
+    window._hjSettings = { hjid: 0, hjsv: 0 };
+
+    // Yandex Metrica
+    window.ym = window.ym || function() { 
+        console.log("🎭 Mock Yandex llamado"); 
+    };
+    window.Ya = window.Ya || { Metrika2: function() {} };
+
+    // Sentry
+    window.Sentry = window.Sentry || {
+        init: function() { console.log("🎭 Mock Sentry.init"); },
+        captureException: function() {},
+        captureMessage: function() {},
+        configureScope: function() {},
+        withScope: function() {},
+        addBreadcrumb: function() {},
+        setUser: function() {},
+        setTag: function() {},
+        setExtra: function() {}
+    };
+
+    // Bugsnag
+    window.Bugsnag = window.Bugsnag || {
+        start: function() { console.log("🎭 Mock Bugsnag.start"); return window.Bugsnag; },
+        notify: function() {},
+        leaveBreadcrumb: function() {},
+        setUser: function() {},
+        addMetadata: function() {},
+        getUser: function() { return {}; },
+        isStarted: function() { return true; },
+        _client: { _config: {} }
+    };
+    window.bugsnag = window.Bugsnag;
+
+    // Facebook Pixel
+    window.fbq = window.fbq || function() { 
+        console.log("🎭 Mock Facebook Pixel"); 
+    };
+    window.fbq.loaded = true;
+    window.fbq.version = '2.0';
+    window._fbq = window.fbq;
+
+    // Twitter Pixel
+    window.twq = window.twq || function() { 
+        console.log("🎭 Mock Twitter Pixel"); 
+    };
+
+    // Pinterest
+    window.pintrk = window.pintrk || function() { 
+        console.log("🎭 Mock Pinterest"); 
+    };
+
+    // LinkedIn
+    window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+    window.lintrk = window.lintrk || function() {};
+
+    // Comscore
+    window.COMSCORE = window.COMSCORE || { beacon: function() {} };
+    window._comscore = window._comscore || [];
+
+    // Quantcast
+    window.__qc = window.__qc || {};
+    window._qevents = window._qevents || [];
+
+    // Chartbeat
+    window._sf_async_config = window._sf_async_config || {};
+    window.pSUPERFLY = window.pSUPERFLY || { activity: function() {} };
+
+    // Mixpanel
+    window.mixpanel = window.mixpanel || {
+        init: function() {},
+        track: function() {},
+        identify: function() {},
+        people: { set: function() {} }
+    };
+
+    // Segment
+    window.analytics = window.analytics || {
+        load: function() {},
+        track: function() {},
+        identify: function() {},
+        page: function() {},
+        ready: function() {}
+    };
+
+    // Heap
+    window.heap = window.heap || {
+        load: function() {},
+        track: function() {},
+        identify: function() {},
+        addUserProperties: function() {}
+    };
+
+    // Amplitude
+    window.amplitude = window.amplitude || {
+        getInstance: function() {
+            return {
+                init: function() {},
+                logEvent: function() {},
+                setUserId: function() {}
+            };
+        }
+    };
+
+    // Intercom
+    window.Intercom = window.Intercom || function() { 
+        console.log("🎭 Mock Intercom"); 
+    };
+    window.intercomSettings = {};
+
+    // Drift
+    window.drift = window.drift || { 
+        SNIPPET_VERSION: '0.3.1',
+        load: function() {},
+        identify: function() {},
+        track: function() {}
+    };
+
+    // Crisp
+    window.$crisp = window.$crisp || [];
+    window.CRISP_WEBSITE_ID = window.CRISP_WEBSITE_ID || '';
+
+    // Olark
+    window.olark = window.olark || function() {};
+
+    // FullStory
+    window.FS = window.FS || {
+        identify: function() {},
+        setUserVars: function() {},
+        event: function() {}
+    };
+
+    // LogRocket
+    window.LogRocket = window.LogRocket || {
+        init: function() {},
+        identify: function() {},
+        track: function() {}
+    };
+
+    // Mouseflow
+    window._mfq = window._mfq || [];
+
+    // Lucky Orange
+    window.__lo_site_id = window.__lo_site_id || 0;
+
+    // Clarity (Microsoft)
+    window.clarity = window.clarity || function() {};
+
+    // Adroll
+    window.adroll = window.adroll || {};
+    window.__adroll_loaded = true;
+
+    console.log("🎭 Mocks de analytics cargados");
+
+    // LISTA DE AMENAZAS AMPLIADA
+    const THREATS = [
+        "google-analytics", "doubleclick", "googletagmanager", "hotjar", 
+        "yandex", "facebook.net", "sentry", "bugsnag", "advmaker",
+        "scorecardresearch", "quantserve", "adroll", "taboola", "outbrain",
+        "googleads", "googlesyndication", "adservice", "amazon-adsystem",
+        "criteo", "moatads", "pubmatic", "rubiconproject", "openx",
+        "popads", "popcash", "mgid", "adblade", "adnxs", "adsrvr",
+        "bluekai", "chartbeat", "comscore", "demdex", "exelator",
+        "krxd", "omtrdc", "2mdn", "adsafeprotected", "pagead",
+        "partner.googleadservices", "tpc.googlesyndication", "static.hotjar",
+        "browser.sentry-cdn", "js.sentry-cdn", "d2wy8f7a9ursnm.cloudfront.net"
+    ];
+
+    // KEYWORDS PARA BANNERS (Archivos de imagen/flash con estas palabras)
+    const BANNER_KEYWORDS = [
+        "/ads/", "/ad/", "/banner/", "/banners/", "advert", "sponsor",
+        "_ad.", "-ad.", "_ads.", "-ads.", "_banner.", "-banner.",
+        "advertisement", "adsense", "adserver", "adtech", "adx.",
+        "flash_ad", "flashad", "swf_ad", "ad.swf", "banner.swf",
+        "ad.gif", "ad.jpg", "ad.png", "banner.gif", "banner.jpg", "banner.png",
+        "adv.", "advs.", "promo.", "promotional", "click.", "tracking.",
+        "impression", "beacon", "pixel", "1x1.", "spacer."
+    ];
+
+    function isBlocked(url) {
+        if (!url) return false;
+        const lower = url.toString().toLowerCase();
+        return THREATS.some(w => lower.includes(w));
+    }
+
+    function isBannerUrl(url) {
+        if (!url) return false;
+        const lower = url.toString().toLowerCase();
+        return BANNER_KEYWORDS.some(w => lower.includes(w));
+    }
+
+    function isAdElement(url) {
+        return isBlocked(url) || isBannerUrl(url);
+    }
+
+    // ========================================
+    // MUTATION OBSERVER - Intercepta elementos antes de cargar
+    // ========================================
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                if (node.nodeType !== 1) return; // Solo elementos
+                
+                // Comprobar el elemento en sí
+                const tagName = node.tagName?.toUpperCase();
+                const src = node.src || node.data || '';
+                const href = node.href || '';
+                
+                if (tagName === 'SCRIPT' && isAdElement(src)) {
+                    console.log("🚫 Script bloqueado por Observer:", src);
+                    node.type = 'javascript/blocked';
+                    node.src = '';
+                    node.remove();
+                    return;
+                }
+                
+                if (tagName === 'IMG' && isAdElement(src)) {
+                    console.log("🚫 Imagen bloqueada por Observer:", src);
+                    node.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+                    node.style.setProperty('display', 'none', 'important');
+                    return;
+                }
+                
+                if (tagName === 'IFRAME' && isAdElement(src)) {
+                    console.log("🚫 Iframe bloqueado por Observer:", src);
+                    node.src = 'about:blank';
+                    node.style.setProperty('display', 'none', 'important');
+                    node.remove();
+                    return;
+                }
+                
+                if ((tagName === 'OBJECT' || tagName === 'EMBED') && isAdElement(src || node.data)) {
+                    console.log("🚫 Object/Embed bloqueado por Observer:", src || node.data);
+                    node.data = '';
+                    node.style.setProperty('display', 'none', 'important');
+                    node.remove();
+                    return;
+                }
+                
+                if (tagName === 'LINK' && isAdElement(href)) {
+                    console.log("🚫 Link bloqueado por Observer:", href);
+                    node.remove();
+                    return;
+                }
+                
+                // Comprobar hijos del nodo añadido
+                if (node.querySelectorAll) {
+                    node.querySelectorAll('script[src], img[src], iframe[src], object[data], embed[src]').forEach(child => {
+                        const childSrc = child.src || child.data || '';
+                        if (isAdElement(childSrc)) {
+                            console.log("🚫 Hijo bloqueado por Observer:", childSrc);
+                            child.remove();
+                        }
+                    });
+                }
+            });
+        });
+    });
+
+    // Iniciar observer lo antes posible
+    observer.observe(document.documentElement || document, {
+        childList: true,
+        subtree: true
+    });
+    console.log("👁️ MutationObserver activo");
+
+    // 1. INTERCEPTOR FETCH
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+        if (isBlocked(args[0])) {
+            console.log("🚫 Fetch bloqueado:", args[0]);
+            return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+        return originalFetch.apply(this, args);
+    };
+
+    // 2. INTERCEPTOR XMLHttpRequest (CORREGIDO)
+    const originalXhrOpen = XMLHttpRequest.prototype.open;
+    const originalXhrSend = XMLHttpRequest.prototype.send;
+    
+    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        this._blockedByAtom = isBlocked(url);
+        if (this._blockedByAtom) {
+            console.log("🚫 XHR bloqueado:", url);
+            // Llamamos al open original con about:blank para mantener el estado OPENED
+            return originalXhrOpen.call(this, method, "about:blank", ...rest);
+        }
+        return originalXhrOpen.call(this, method, url, ...rest);
+    };
+    
+    XMLHttpRequest.prototype.send = function(body) {
+        if (this._blockedByAtom) {
+            // Simular respuesta exitosa sin hacer petición real
+            const self = this;
+            setTimeout(() => {
+                Object.defineProperty(self, 'readyState', { value: 4, writable: false });
+                Object.defineProperty(self, 'status', { value: 200, writable: false });
+                Object.defineProperty(self, 'responseText', { value: '{}', writable: false });
+                Object.defineProperty(self, 'response', { value: '{}', writable: false });
+                self.dispatchEvent(new Event('readystatechange'));
+                self.dispatchEvent(new Event('load'));
+                self.dispatchEvent(new Event('loadend'));
+            }, 1);
+            return;
+        }
+        return originalXhrSend.call(this, body);
+    };
+
+    // 3. INTERCEPTOR sendBeacon (para tracking)
+    const originalSendBeacon = navigator.sendBeacon;
+    navigator.sendBeacon = function(url, data) {
+        if (isBlocked(url)) {
+            console.log("🚫 Beacon bloqueado:", url);
+            return true; // Simular éxito
+        }
+        return originalSendBeacon.call(this, url, data);
+    };
+
+    // 4. INTERCEPTOR Image (tracking pixels)
+    const OriginalImage = window.Image;
+    window.Image = function(w, h) {
+        const img = new OriginalImage(w, h);
+        const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src') ||
+                                       Object.getOwnPropertyDescriptor(img.__proto__, 'src');
+        if (originalSrcDescriptor && originalSrcDescriptor.set) {
+            Object.defineProperty(img, 'src', {
+                set: function(val) {
+                    if (isBlocked(val)) {
+                        console.log("🚫 Pixel bloqueado:", val);
+                        return;
+                    }
+                    originalSrcDescriptor.set.call(this, val);
+                },
+                get: function() {
+                    return originalSrcDescriptor.get ? originalSrcDescriptor.get.call(this) : '';
+                }
+            });
+        }
+        return img;
+    };
+    window.Image.prototype = OriginalImage.prototype;
+
+    // 5. CSS DE HIERRO MEJORADO
+    const cssRules = `
+        /* Flash & Plugins */
+        object, embed, param { display: none !important; visibility: hidden !important; }
+        
+        /* Contenedores de objeto */
+        div:has(> object), div:has(> embed) { display: none !important; }
+        
+        /* Ad Blocks - Selectores generales */
+        .ad-unit, .ad-zone, .ad-slot, .banner-ads, .advertisement, #ads,
+        .afs_ads, .textad, .ad-wrapper, .ad-container, .advert,
+        div[id^="google_ads_"], div[id^="div-gpt-ad"],
+        div[class*="content_ad"], div[class*="sponsor"],
+        div[data-ad], div[data-ad-client], div[data-ad-slot],
+        
+        /* Iframes de anuncios */
+        iframe[src*="googleads"], iframe[src*="doubleclick"],
+        iframe[id*="google_ads"], iframe[name*="google_ads"],
+        iframe[src*="googlesyndication"], iframe[src*="pagead"],
+        
+        /* Imágenes */
+        img[src*="advmaker"], img[src*="banner"], a[href*="/ad/"],
+        img[src*="pixel"], img[src*="beacon"], img[width="1"][height="1"],
+        
+        /* YouTube */
+        .video-ads, .ytp-ad-module, .ytp-ad-overlay-container,
+        ytd-ad-slot-renderer, ytd-rich-item-renderer[is-ad]
+        
+        { display: none !important; width: 0 !important; height: 0 !important; 
+          opacity: 0 !important; visibility: hidden !important; 
+          pointer-events: none !important; position: absolute !important; }
+    `;
+
+    function injectCSS() {
+        const style = document.createElement('style');
+        style.id = 'atom-shield-css';
+        style.innerHTML = cssRules;
+        (document.head || document.documentElement).appendChild(style);
+    }
+    if (document.head) injectCSS(); else document.addEventListener('DOMContentLoaded', injectCSS);
+
+    // 6. EL EJECUTOR (300ms)
+    setInterval(() => {
+        // A. YouTube Skip
+        document.querySelectorAll('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button').forEach(btn => btn.click());
+
+        // B. Acelerar Video Anuncio
+        const player = document.querySelector('#movie_player');
+        if (player && player.classList.contains('ad-showing')) {
+            const video = document.querySelector('video');
+            if (video) { video.muted = true; video.playbackRate = 16; video.currentTime = video.duration || 0; }
+            document.querySelectorAll('.ytp-ad-overlay-close-button').forEach(b => b.click());
+        }
+
+        // C. MATADOR DE FLASH - Forzar ocultar objects y sus padres
+        document.querySelectorAll('object, embed').forEach(el => {
+            el.style.setProperty('display', 'none', 'important');
+            el.style.setProperty('visibility', 'hidden', 'important');
+            let parent = el.parentElement;
+            while (parent && parent !== document.body) {
+                if (parent.tagName === 'DIV' && parent.children.length <= 2) {
+                    parent.style.setProperty('display', 'none', 'important');
+                    parent.style.setProperty('width', '0', 'important');
+                    parent.style.setProperty('height', '0', 'important');
+                }
+                parent = parent.parentElement;
+            }
+        });
+
+        // D. CAZADOR DE TAMAÑOS IAB
+        document.querySelectorAll('div, iframe').forEach(el => {
+            if (el.offsetParent !== null) {
+                const w = el.offsetWidth, h = el.offsetHeight;
+                // Tamaños IAB estándar
+                const isBannerSize = (w === 728 && h === 90) || (w === 300 && h === 250) || 
+                    (w === 160 && h === 600) || (w === 468 && h === 60) || 
+                    (w === 320 && h === 50) || (w === 300 && h === 600) || (w === 970 && h === 250);
+                if (isBannerSize) {
+                    if (el.tagName === 'IFRAME' || el.children.length === 0 || 
+                        el.querySelector('iframe, object, embed') || (el.innerText || '').length < 10) {
+                        el.style.setProperty('display', 'none', 'important');
+                        if (el.parentElement) el.parentElement.style.setProperty('display', 'none', 'important');
+                    }
+                }
+            }
+        });
+
+        // E. Limpieza de texto publicitario
+        document.querySelectorAll('ytd-rich-item-renderer').forEach(el => {
+            if ((el.innerText || '').toUpperCase().includes('PATROCINADO')) el.remove();
+        });
+        document.querySelectorAll('div, span').forEach(el => {
+            if (el.offsetParent !== null && (el.innerText || '').length < 30) {
+                const text = (el.innerText || '').toLowerCase().trim();
+                if (text === 'advertisement' || text === 'sponsored' || text === 'ad') {
+                    el.style.setProperty('display', 'none', 'important');
+                    if (el.parentElement) el.parentElement.style.setProperty('display', 'none', 'important');
+                }
+            }
+        });
+
+    }, 300);
+
+    // 7. ANTI-POPUPS
+    window.open = function() { console.log("🚫 Popup bloqueado"); return null; };
+
+    console.log("🛡️ Atom Shield v8.1: Todas las defensas activas");
+})();

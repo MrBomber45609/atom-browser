@@ -1,0 +1,248 @@
+================================================================================
+                    ATOM SHIELD v8 "El Ejecutor" - ANÁLISIS COMPLETO
+================================================================================
+
+PUNTUACIÓN ACTUAL: 56/100 en adblock-tester.com
+OBJETIVO: 60-70 puntos
+
+================================================================================
+                              CÓDIGO JAVASCRIPT COMPLETO
+================================================================================
+
+(function() {
+    console.log("🛡️ Atom Shield v8: El Ejecutor");
+
+    // LISTA DE AMENAZAS (Interceptores 200 OK)
+    const THREATS = [
+        "google-analytics", "doubleclick", "googletagmanager", "hotjar", 
+        "yandex", "facebook.net", "sentry", "bugsnag", "advmaker",
+        "scorecardresearch", "quantserve", "adroll", "taboola", "outbrain",
+        "googleads", "googlesyndication", "adservice", "amazon-adsystem",
+        "criteo", "moatads", "pubmatic", "rubiconproject", "openx",
+        "popads", "popcash", "mgid", "adblade"
+    ];
+
+    // 1. INTERCEPTOR DE RED (Modo Silencioso - 200 OK)
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+        const url = args[0] ? args[0].toString().toLowerCase() : "";
+        if (THREATS.some(w => url.includes(w))) {
+            return new Response("{}", { status: 200 });
+        }
+        return originalFetch(...args);
+    };
+
+    const originalOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url) {
+        if (typeof url === "string" && THREATS.some(w => url.toLowerCase().includes(w))) {
+            this.isBlocked = true;
+            return;
+        }
+        return originalOpen.apply(this, arguments);
+    };
+    const originalSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function() {
+        if (this.isBlocked) {
+            Object.defineProperty(this, 'readyState', { value: 4 });
+            Object.defineProperty(this, 'status', { value: 200 });
+            this.dispatchEvent(new Event('load'));
+            return;
+        }
+        return originalSend.apply(this, arguments);
+    };
+
+    // 2. CSS DE HIERRO
+    const cssRules = `
+        /* Flash Killer */
+        object, embed, param { display: none !important; }
+        
+        /* Ad Blocks */
+        .ad-unit, .ad-zone, .ad-slot, .banner-ads, .advertisement, #ads,
+        div[id^="google_ads_"], div[id^="div-gpt-ad"],
+        div[class*="content_ad"], div[class*="sponsor"],
+        iframe[src*="googleads"], iframe[src*="doubleclick"], 
+        img[src*="advmaker"], img[src*="banner"], a[href*="/ad/"],
+        .video-ads, .ytp-ad-module, .ytp-ad-overlay-container,
+        ytd-ad-slot-renderer, ytd-rich-item-renderer[is-ad]
+        { display: none !important; width: 0 !important; height: 0 !important; opacity: 0 !important; pointer-events: none !important; }
+    `;
+
+    function injectCSS() {
+        const style = document.createElement('style');
+        style.innerHTML = cssRules;
+        (document.head || document.documentElement).appendChild(style);
+    }
+    if (document.head) injectCSS(); else window.addEventListener('DOMContentLoaded', injectCSS);
+
+    // 3. EL EJECUTOR (Intervalo 300ms)
+    setInterval(() => {
+        // A. Auto-Click Saltar Anuncio (YouTube)
+        const skipBtns = document.querySelectorAll('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button');
+        skipBtns.forEach(btn => btn.click());
+
+        // B. Acelerar Video Anuncio
+        const player = document.querySelector('#movie_player');
+        if (player && player.classList.contains('ad-showing')) {
+            const video = document.querySelector('video');
+            if (video) {
+                video.muted = true;
+                video.playbackRate = 16.0;
+                video.currentTime = video.duration || 0;
+            }
+            document.querySelectorAll('.ytp-ad-overlay-close-button').forEach(b => b.click());
+        }
+
+        // C. MATADOR DE FLASH (Nuevo en v8)
+        // Busca objetos Flash y oculta no solo el objeto, sino SU CAJA PADRE
+        document.querySelectorAll('object, embed').forEach(el => {
+            el.style.setProperty('display', 'none', 'important');
+            if (el.parentElement && el.parentElement.tagName === 'DIV') {
+                el.parentElement.style.setProperty('display', 'none', 'important');
+                el.parentElement.style.setProperty('width', '0', 'important');
+                el.parentElement.style.setProperty('height', '0', 'important');
+            }
+        });
+
+        // D. CAZADOR DE TAMAÑOS SEGURO (Nuevo en v8)
+        // Busca elementos con tamaños de anuncio exactos que estén vacíos o sean iframes
+        document.querySelectorAll('div, iframe').forEach(el => {
+            if (el.offsetParent !== null) { // Si es visible
+                const w = el.offsetWidth;
+                const h = el.offsetHeight;
+                
+                // Tamaños estándar IAB (Leaderboard, Rectangle, Skyscraper)
+                if ((w === 728 && h === 90) || (w === 300 && h === 250) || 
+                    (w === 160 && h === 600) || (w === 468 && h === 60)) {
+                    
+                    // SOLO borrar si parece un anuncio (tiene iframes, scripts o está vacío)
+                    if (el.tagName === 'IFRAME' || el.children.length === 0 || el.querySelector('iframe') || el.innerText.length < 10) {
+                        el.style.setProperty('display', 'none', 'important');
+                    }
+                }
+            }
+        });
+
+        // E. Limpieza Feed YouTube y Texto
+        document.querySelectorAll('ytd-rich-item-renderer').forEach(el => {
+            if (el.innerText.toUpperCase().includes('PATROCINADO')) el.remove();
+        });
+        document.querySelectorAll('div, span').forEach(el => {
+            if (el.offsetParent !== null && el.innerText.length < 25) {
+                const text = el.innerText.toLowerCase().trim();
+                if (text === 'advertisement' || text === 'sponsored') {
+                    el.style.setProperty('display', 'none', 'important');
+                    if(el.parentElement) el.parentElement.style.setProperty('display', 'none', 'important');
+                }
+            }
+        });
+
+    }, 300);
+
+    // 4. ANTI-POPUPS
+    window.open = function() { console.log("🚫 Popup bloqueado"); return null; };
+
+})();
+
+================================================================================
+                         ANÁLISIS DE POSIBLES PROBLEMAS
+================================================================================
+
+PROBLEMA 1: EL SCRIPT PUEDE ESTAR EJECUTÁNDOSE DEMASIADO TARDE
+-----------------------------------------------------------------------------
+El initialization_script de Tauri se ejecuta después de que la página cargue.
+adblock-tester.com puede detectar que:
+- Los recursos se cargaron inicialmente (antes de interceptar)
+- Los elementos existían brevemente antes de ocultarse
+
+SOLUCIÓN PROPUESTA: Ejecutar el script inmediatamente en document_start
+
+PROBLEMA 2: FALTA INTERCEPTAR <script> CON SRC DE ANUNCIOS
+-----------------------------------------------------------------------------
+Actualmente solo interceptamos fetch() y XMLHttpRequest.
+No interceptamos etiquetas <script src="ads..."> que se cargan directamente.
+
+SOLUCIÓN PROPUESTA: Usar MutationObserver para eliminar scripts de anuncios
+
+PROBLEMA 3: FALTA INTERCEPTAR <img> DE TRACKERS
+-----------------------------------------------------------------------------
+Los tracking pixels (1x1 images) no pasan por fetch/XHR.
+
+SOLUCIÓN PROPUESTA: Interceptar Image.prototype.src
+
+PROBLEMA 4: EL TEST PUEDE VERIFICAR offsetWidth/offsetHeight
+-----------------------------------------------------------------------------
+Aunque ocultemos con display:none, el test puede cachear las dimensiones
+antes de que actuemos.
+
+SOLUCIÓN PROPUESTA: También colapsar con width:0 height:0 en el CSS inicial
+
+PROBLEMA 5: FALTA SENDBEACON INTERCEPTOR
+-----------------------------------------------------------------------------
+navigator.sendBeacon() se usa para tracking silencioso.
+
+SOLUCIÓN PROPUESTA: Interceptar navigator.sendBeacon
+
+================================================================================
+                    SELECTORES CSS ADICIONALES RECOMENDADOS
+================================================================================
+
+/* Clases comunes de adblock-tester.com */
+.afs_ads
+.textad
+.ad-wrapper
+.ad-container
+.advert
+.ad-header
+.ad-footer
+#ad-container
+#ad-banner
+[data-ad]
+[data-ad-client]
+[data-ad-slot]
+[class*="google_ad"]
+[id*="google_ad"]
+
+/* Iframes de anuncios */
+iframe[id*="google_ads"]
+iframe[name*="google_ads"]
+iframe[src*="tpc.googlesyndication"]
+
+/* Imágenes de tracking */
+img[src*="pixel"]
+img[src*="beacon"]
+img[src*="tracker"]
+img[width="1"][height="1"]
+
+================================================================================
+                     DOMINIOS ADICIONALES RECOMENDADOS
+================================================================================
+
+Añadir a la lista THREATS:
+- "adnxs.com"
+- "adsrvr.org"
+- "advertising.com"
+- "bluekai.com"
+- "chartbeat.com"
+- "clicktale.com"
+- "comscore.com"
+- "demdex.net"
+- "exelator.com"
+- "krxd.net"
+- "nexac.com"
+- "omtrdc.net"
+- "turn.com"
+- "2mdn.net"
+
+================================================================================
+                          PRÓXIMOS PASOS SUGERIDOS
+================================================================================
+
+1. Analizar manualmente qué tests específicos fallan en adblock-tester.com
+2. Abrir DevTools (F12) en Atom Browser y ver la consola para errores
+3. Verificar que "🛡️ Atom Shield v8: El Ejecutor" aparece en consola
+4. Identificar qué elementos NO se están ocultando
+5. Implementar las soluciones propuestas arriba
+
+================================================================================
+                              FIN DEL ANÁLISIS
+================================================================================

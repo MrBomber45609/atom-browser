@@ -33,122 +33,149 @@ struct TabInfo {
     url: String,
 }
 
-// --- SCRIPT ATOM SHIELD v6.5 (Restaurado + Anti-Flash) ---
+// --- SCRIPT ATOM SHIELD v15 "The Property Trap" ---
 const ATOM_SHIELD_SCRIPT: &str = r#"
 (function() {
-    console.log("🛡️ Atom Shield v6.5: Estabilidad Restaurada");
-
-    // LISTA DE AMENAZAS
+    // 🛡️ ATOM SHIELD v15
+    // Estrategia: Interceptar los 'setters' de las propiedades .src antes de que el navegador actúe.
+    
     const THREATS = [
         "google-analytics", "doubleclick", "googletagmanager", "hotjar", 
         "yandex", "facebook.net", "sentry", "bugsnag", "advmaker",
         "scorecardresearch", "quantserve", "adroll", "taboola", "outbrain",
         "googleads", "googlesyndication", "adservice", "amazon-adsystem",
         "criteo", "moatads", "pubmatic", "rubiconproject", "openx",
-        "popads", "popcash", "mgid", "adblade"
+        "popads", "popcash", "mgid", "adblade", "chartbeat", "segment",
+        "clarity", "mixpanel", "optimizely", "crazyegg", "adtech", "fastclick",
+        "youtube.com/pagead", "pagead2", "adsense"
     ];
 
-    // 1. INTERCEPTOR DE RED (Modo Silencioso - 200 OK)
-    const originalFetch = window.fetch;
-    window.fetch = async function(...args) {
-        const url = args[0] ? args[0].toString().toLowerCase() : "";
-        if (THREATS.some(w => url.includes(w))) {
-            return new Response("{}", { status: 200 });
+    // Función de chequeo rápido
+    function isBlocked(url) {
+        if (!url) return false;
+        if (typeof url !== 'string') return false;
+        const u = url.toLowerCase();
+        // Permitir URLs locales o data (evita romper imágenes base64)
+        if (u.startsWith("data:") || u.startsWith("blob:") || u.startsWith("file:")) return false;
+        return THREATS.some(t => u.includes(t));
+    }
+
+    // --- 1. THE PROPERTY TRAP (La Trampa) ---
+    // Interceptamos la asignación de .src en Scripts, Iframes e Imágenes
+    // Esto evita la petición de red ("Loading: Failed" ✅)
+    
+    function trapProperty(elementPrototype, propertyName) {
+        const originalDescriptor = Object.getOwnPropertyDescriptor(elementPrototype, propertyName);
+        if (!originalDescriptor) return;
+
+        Object.defineProperty(elementPrototype, propertyName, {
+            set: function(value) {
+                if (isBlocked(value)) {
+                    // console.log("🚫 Trampa activada:", value);
+                    // Asignamos algo inocuo o nada
+                    return originalDescriptor.set.call(this, ""); 
+                }
+                return originalDescriptor.set.call(this, value);
+            },
+            get: originalDescriptor.get
+        });
+    }
+
+    try {
+        trapProperty(HTMLScriptElement.prototype, 'src');
+        trapProperty(HTMLImageElement.prototype, 'src');
+        trapProperty(HTMLIFrameElement.prototype, 'src');
+        trapProperty(HTMLEmbedElement.prototype, 'src');
+        // Para Flash/Objects
+        trapProperty(HTMLObjectElement.prototype, 'data'); 
+    } catch (e) { console.error("Atom Trap Error", e); }
+
+    // --- 2. INTERCEPTOR DE CREACIÓN DE ELEMENTOS ---
+    const originalCreateElement = document.createElement;
+    document.createElement = function(tagName) {
+        const el = originalCreateElement.call(document, tagName);
+        // Si es un elemento peligroso, lo vigilamos desde el nacimiento
+        if (['SCRIPT', 'IFRAME', 'IMG', 'OBJECT', 'EMBED'].includes(tagName.toUpperCase())) {
+            // Ya tiene la trampa del prototipo, pero por seguridad:
+            el.addEventListener('beforescriptexecute', function(e) {
+                if (isBlocked(el.src)) { e.preventDefault(); el.remove(); }
+            });
         }
-        return originalFetch(...args);
+        return el;
     };
 
-    const originalOpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function(method, url) {
-        if (typeof url === "string" && THREATS.some(w => url.toLowerCase().includes(w))) {
-            this.isBlocked = true;
-            return;
+    // --- 3. MOCKS DE ANALYTICS (Para que no explote la web) ---
+    // Muchas webs fallan si 'ga' no existe. Lo creamos falso.
+    function mock(name) {
+        if (!window[name]) {
+            Object.defineProperty(window, name, {
+                value: function() { return {}; },
+                writable: false
+            });
         }
-        return originalOpen.apply(this, arguments);
-    };
-    const originalSend = XMLHttpRequest.prototype.send;
-    XMLHttpRequest.prototype.send = function() {
-        if (this.isBlocked) {
-            Object.defineProperty(this, 'readyState', { value: 4 });
-            Object.defineProperty(this, 'status', { value: 200 });
-            this.dispatchEvent(new Event('load'));
-            return;
-        }
-        return originalSend.apply(this, arguments);
-    };
+    }
+    mock('ga'); mock('gtag'); mock('fbg'); mock('sentry');
 
-    // 2. CSS DE HIERRO (Con Anti-Flash)
+    // --- 4. CSS NUCLEAR (Con selector :has para limpiar huecos) ---
     const cssRules = `
-        /* Flash y Plugins */
-        object, embed, param { 
-            display: none !important; width: 0 !important; height: 0 !important; 
-        }
+        /* Flash Killer + Contenedor */
+        object, embed { display: none !important; }
+        div:has(> object), div:has(> embed) { display: none !important; width: 0 !important; height: 0 !important; }
 
-        /* Bloques de anuncios genéricos */
-        .ad-unit, .ad-zone, .ad-slot, .banner-ads, .advertisement, #ads,
-        div[id^="google_ads_"], div[id^="div-gpt-ad"],
-        div[class*="content_ad"], div[class*="sponsor"],
+        /* Ad Units vacíos */
+        .ad-unit, .ad-zone, .banner-ads, #ads, .advertisement,
+        iframe[src*="googleads"], iframe[src*="doubleclick"],
+        .video-ads, .ytp-ad-module, ytd-ad-slot-renderer,
+        ytd-rich-item-renderer[is-ad], ytd-promoted-sparkles-web-renderer
+        { display: none !important; width: 0 !important; height: 0 !important; }
         
-        /* Elementos visuales específicos */
-        iframe[src*="googleads"], iframe[src*="doubleclick"], 
-        img[src*="advmaker"], img[src*="banner"], a[href*="/ad/"],
-        
-        /* YouTube */
-        .video-ads, .ytp-ad-module, .ytp-ad-overlay-container,
-        ytd-ad-slot-renderer, ytd-rich-item-renderer[is-ad]
-        { display: none !important; width: 0 !important; height: 0 !important; opacity: 0 !important; pointer-events: none !important; }
+        /* Limpieza de contenedores padres que tienen anuncios */
+        div:has(> iframe[src*="googleads"]), 
+        div:has(> iframe[src*="doubleclick"]),
+        div:has(> img[src*="advmaker"])
+        { display: none !important; width: 0 !important; height: 0 !important; }
     `;
-
     function injectCSS() {
         const style = document.createElement('style');
+        style.id = "atom-shield-css"; 
         style.innerHTML = cssRules;
         (document.head || document.documentElement).appendChild(style);
     }
     if (document.head) injectCSS(); else window.addEventListener('DOMContentLoaded', injectCSS);
 
-    // 3. EL ROBOT (300ms)
+    // --- 5. ROBOT YOUTUBE (Ultra Rápido 50ms) ---
     setInterval(() => {
-        // A. Auto-Click Saltar Anuncio
-        document.querySelectorAll('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button').forEach(btn => btn.click());
-
-        // B. Acelerar Video Anuncio
+        // 1. Clicker
+        const skipBtns = document.querySelectorAll('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button');
+        if (skipBtns.length > 0) {
+            skipBtns.forEach(b => b.click());
+            console.log("⚡ Skip");
+        }
+        
+        // 2. Acelerador + Silenciador
         const player = document.querySelector('#movie_player');
         if (player && player.classList.contains('ad-showing')) {
-            const video = document.querySelector('video');
-            if (video) {
-                video.muted = true;
-                video.playbackRate = 16.0;
-                video.currentTime = video.duration || 0;
-            }
-            document.querySelectorAll('.ytp-ad-overlay-close-button').forEach(b => b.click());
+             const v = document.querySelector('video');
+             if (v) { 
+                v.muted = true; 
+                // Teletransporte al final
+                if (!isNaN(v.duration)) v.currentTime = v.duration; 
+                v.playbackRate = 16.0;
+             }
+             // Cerrar overlays
+             document.querySelectorAll('.ytp-ad-overlay-close-button').forEach(b => b.click());
         }
 
-        // C. Cazador de Texto
-        document.querySelectorAll('div, span').forEach(el => {
-            if (el.offsetParent !== null && el.innerText && el.innerText.length < 25) {
-                const text = el.innerText.toLowerCase().trim();
-                if (text === 'advertisement' || text === 'sponsored') {
-                    el.style.display = 'none';
-                    if(el.parentElement) el.parentElement.style.display = 'none';
-                }
-            }
-        });
-
-        // D. Limpieza Feed YouTube
+        // 3. Limpieza de Feed (Patrocinado)
         document.querySelectorAll('ytd-rich-item-renderer').forEach(el => {
-            if (el.innerText.toUpperCase().includes('PATROCINADO')) el.remove();
+            const txt = (el.innerText || "").toUpperCase();
+            if (txt.includes("PATROCINADO") || txt.includes("SPONSORED")) el.remove();
         });
 
-    }, 300);
+    }, 50); // 50ms = Reacción casi instantánea
 
-    // 4. ANTI-POPUPS
-    window.open = function() { console.log("🚫 Popup bloqueado"); return null; };
-    
-    console.log("🛡️ Atom Shield v6.5: Defensas activas");
 })();
 "#;
-
-// --- COMANDOS ---
 
 #[tauri::command]
 async fn create_tab(
@@ -156,12 +183,12 @@ async fn create_tab(
     state: tauri::State<'_, TabState>,
     url: Option<String>,
 ) -> Result<String, String> {
-    let (tab_id, old_active, initial_url) = {
+    // Gestión del ID y estado
+    let (tab_id, old_active) = {
         let mut manager = state.lock().map_err(|e| e.to_string())?;
         let id = manager.new_id();
         let old = manager.active_tab.clone();
-        let url_str = url.unwrap_or_else(|| "about:blank".to_string());
-        (id, old, url_str)
+        (id, old)
     };
 
     if let Some(old_id) = old_active {
@@ -173,13 +200,14 @@ async fn create_tab(
     let win = app.get_window("main").ok_or("No main window")?;
     let handle = app.clone();
     let tab_id_clone = tab_id.clone();
+    let initial_url = url.unwrap_or_else(|| "about:blank".to_string());
     let parsed_url = initial_url
         .parse()
         .unwrap_or("about:blank".parse().unwrap());
-
-    let barra_altura = 76.0;
+    let barra_altura = 90.0;
     let size = win.inner_size().map_err(|e| e.to_string())?;
 
+    // INYECCIÓN
     win.add_child(
         tauri::webview::WebviewBuilder::new(&tab_id, WebviewUrl::External(parsed_url))
             .auto_resize()
@@ -253,17 +281,14 @@ fn switch_tab(
         manager.active_tab = Some(tab_id.clone());
         old
     };
-
     if let Some(old) = old_active {
-        if let Some(webview) = app.get_webview(&old) {
-            let _ = webview.hide();
+        if let Some(view) = app.get_webview(&old) {
+            let _ = view.hide();
         }
     }
-
-    if let Some(webview) = app.get_webview(&tab_id) {
-        let _ = webview.show();
+    if let Some(view) = app.get_webview(&tab_id) {
+        let _ = view.show();
     }
-
     Ok(())
 }
 
@@ -323,8 +348,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             navigate,
             go_back,
-            go_forward,
             reload,
+            go_forward,
             create_tab,
             close_tab,
             switch_tab,
@@ -332,7 +357,9 @@ pub fn run() {
         ])
         .setup(move |app| {
             let win = app.get_window("main").unwrap();
+            let handle = app.handle().clone();
 
+            // PRIMERA TAB
             let tab_id = {
                 let mut manager = tab_state.lock().unwrap();
                 let id = manager.new_id();
@@ -341,9 +368,8 @@ pub fn run() {
                 id
             };
 
-            let barra_altura = 76.0;
+            let barra_altura = 90.0;
             let size = win.inner_size().unwrap();
-            let handle = app.handle().clone();
             let tab_id_clone = tab_id.clone();
 
             let _ = win.add_child(
@@ -352,7 +378,7 @@ pub fn run() {
                     WebviewUrl::External("about:blank".parse().unwrap()),
                 )
                 .auto_resize()
-                .initialization_script(ATOM_SHIELD_SCRIPT)
+                .initialization_script(ATOM_SHIELD_SCRIPT) // ¡Importante!
                 .on_page_load(move |webview, _payload| {
                     if let Ok(url) = webview.url() {
                         let _ = handle.emit(
@@ -367,28 +393,6 @@ pub fn run() {
                 tauri::LogicalPosition::new(0.0, barra_altura),
                 tauri::LogicalSize::new(size.width as f64, size.height as f64 - barra_altura),
             )?;
-
-            // Resize listener
-            let app_handle = app.handle().clone();
-            let state_clone = tab_state.clone();
-            win.on_window_event(move |event| {
-                if let tauri::WindowEvent::Resized(size) = event {
-                    let barra_altura = 76.0;
-                    if let Some(_window) = app_handle.get_window("main") {
-                        let manager = state_clone.lock().unwrap();
-                        for tab_id in manager.tabs.keys() {
-                            if let Some(webview) = app_handle.get_webview(tab_id) {
-                                let _ = webview
-                                    .set_position(tauri::LogicalPosition::new(0.0, barra_altura));
-                                let _ = webview.set_size(tauri::LogicalSize::new(
-                                    size.width as f64,
-                                    size.height as f64 - barra_altura,
-                                ));
-                            }
-                        }
-                    }
-                }
-            });
 
             Ok(())
         })
