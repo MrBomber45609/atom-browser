@@ -12,7 +12,14 @@
   <!-- Barra de progreso -->
   <div id="progress-bar"></div>
 
-  <!-- Barra de control unificada (estilo Helium) -->
+  <!-- Barra de título / Pestañas -->
+  <div id="title-bar" data-tauri-drag-region>
+    <img src="ico.png" alt="Atom" id="browser-icon">
+    <div id="tabs-container"></div>
+    <button id="btn-new-tab" title="Nueva pestaña">+</button>
+  </div>
+
+  <!-- Barra de control unificada -->
   <div id="control-bar">
     <button id="btn-back" title="Atrás">‹</button>
     <button id="btn-forward" title="Adelante">›</button>
@@ -20,8 +27,75 @@
 
     <input type="text" id="url-bar" placeholder="Buscar o escribir URL" autocomplete="off">
 
-    <div id="tabs-container"></div>
-    <button id="btn-new-tab" title="Nueva pestaña">+</button>
+    <!-- Marcador (estrella) -->
+    <button id="btn-bookmark" title="Añadir a marcadores">☆</button>
+
+    <!-- Ad-blocker siempre activo -->
+    <button id="btn-adblock" class="active" title="Atom Shield: Siempre Activo">🛡</button>
+
+    <!-- Menú de 3 puntos -->
+    <button id="btn-menu" title="Menú">⋮</button>
+  </div>
+
+  <!-- Menú desplegable -->
+  <div id="dropdown-menu" class="hidden">
+    <div class="menu-item" id="menu-history">
+      <span>🕒</span> Historial
+    </div>
+    <div class="menu-item" id="menu-search-engine">
+      <span>🔍</span> Motor de búsqueda
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" id="menu-bookmarks">
+      <span>⭐</span> Marcadores
+    </div>
+  </div>
+
+  <!-- Selector de motor de búsqueda (oculto, activado desde menú) -->
+  <div id="search-engine-overlay" class="overlay hidden">
+    <div class="overlay-content small">
+      <div class="overlay-header">
+        <h3>🔍 Motor de búsqueda</h3>
+        <button id="btn-close-search-engine" class="overlay-close">✕</button>
+      </div>
+      <div class="search-engine-list">
+        <div class="search-engine-item" data-engine="duckduckgo">
+          <span>🦆</span> DuckDuckGo
+        </div>
+        <div class="search-engine-item" data-engine="google">
+          <span>🔍</span> Google
+        </div>
+        <div class="search-engine-item" data-engine="brave">
+          <span>🦁</span> Brave
+        </div>
+        <div class="search-engine-item" data-engine="startpage">
+          <span>🔒</span> Startpage
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlay de Historial -->
+  <div id="history-overlay" class="overlay hidden">
+    <div class="overlay-content">
+      <div class="overlay-header">
+        <h3>📜 Historial</h3>
+        <button id="btn-close-history" class="overlay-close">✕</button>
+      </div>
+      <div id="history-list"></div>
+      <button id="btn-clear-history" class="overlay-action">Borrar todo</button>
+    </div>
+  </div>
+
+  <!-- Overlay de Marcadores -->
+  <div id="bookmarks-overlay" class="overlay hidden">
+    <div class="overlay-content">
+      <div class="overlay-header">
+        <h3>⭐ Marcadores</h3>
+        <button id="btn-close-bookmarks" class="overlay-close">✕</button>
+      </div>
+      <div id="bookmarks-list"></div>
+    </div>
   </div>
 
   <img id="favicon" src="" alt="" style="display:none" />

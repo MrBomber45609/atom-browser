@@ -1,0 +1,190 @@
+================================================================================
+              ATOM SHIELD v7 - ANÁLISIS COMPLETO (2026-02-06)
+================================================================================
+
+PROBLEMA: La puntuación SUBIÓ de 27 a 53, pero luego BAJÓ a 43 con v7
+
+HISTORIAL DE PUNTUACIONES:
+- Inicial (sin bloqueador): ~0
+- v3.5: 43 puntos
+- v5 (interceptores 403): 27 puntos (BAJÓ - los 403 causaban errores)
+- v6 (interceptores 200): 53 puntos (SUBIÓ - mejor enfoque)
+- v7 (Script Sniper): 43 puntos (BAJÓ - algo rompimos)
+
+================================================================================
+                    ANÁLISIS: ¿QUÉ ROMPIÓ LA v7?
+================================================================================
+
+HIPÓTESIS 1: Script Sniper interfiere con scripts legítimos
+- El MutationObserver elimina scripts ANTES de que se carguen
+- Pero si elimina scripts que el test usa para MEDIR el bloqueo, 
+  el test puede pensar que NO bloqueamos nada
+
+HIPÓTESIS 2: El cazador de tamaños es demasiado agresivo
+- Busca elementos de 728x90, 300x250 exactos
+- Puede estar ocultando elementos del test que NO son anuncios
+
+HIPÓTESIS 3: Los interceptores fetch/XHR combinados con Script Sniper
+- Doble bloqueo puede causar comportamiento inesperado
+- El test puede detectar la manipulación
+
+================================================================================
+                    SCRIPT JAVASCRIPT v7 ACTUAL
+================================================================================
+
+(function() {
+    console.log("🛡️ Atom Shield v7: Francotirador Activado");
+
+    // LISTA DE AMENAZAS (27 dominios)
+    const THREATS = [
+        "google-analytics", "doubleclick", "googletagmanager", "hotjar", 
+        "yandex", "facebook.net", "sentry", "bugsnag", "advmaker",
+        "scorecardresearch", "quantserve", "adroll", "taboola", "outbrain",
+        "googleads", "googlesyndication", "adservice", "amazon-adsystem",
+        "criteo", "moatads", "pubmatic", "rubiconproject", "openx",
+        "popads", "popcash", "mgid", "adblade"
+    ];
+
+    // 1. EL FRANCOTIRADOR DE SCRIPTS (NUEVO EN v7 - POSIBLE CULPABLE)
+    const scriptSniper = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                if (node.tagName === 'SCRIPT' && node.src) {
+                    const src = node.src.toLowerCase();
+                    if (THREATS.some(t => src.includes(t))) {
+                        console.log("💥 Script eliminado:", src);
+                        node.src = "";
+                        node.remove();
+                    }
+                }
+                if (node.tagName === 'IFRAME') {
+                    const src = (node.src || "").toLowerCase();
+                    if (THREATS.some(t => src.includes(t)) || src.includes("ads")) {
+                        node.remove();
+                    }
+                }
+            }
+        }
+    });
+    scriptSniper.observe(document.documentElement, { childList: true, subtree: true });
+
+    // 2. INTERCEPTOR DE RED (Ya estaba en v6)
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+        const url = args[0] ? args[0].toString().toLowerCase() : "";
+        if (THREATS.some(w => url.includes(w))) {
+            return new Response("{}", { status: 200 });
+        }
+        return originalFetch(...args);
+    };
+
+    const originalOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url) {
+        if (typeof url === "string" && THREATS.some(w => url.toLowerCase().includes(w))) {
+            this.isBlocked = true;
+            return;
+        }
+        return originalOpen.apply(this, arguments);
+    };
+    const originalSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function() {
+        if (this.isBlocked) {
+            Object.defineProperty(this, 'readyState', { value: 4 });
+            Object.defineProperty(this, 'status', { value: 200 });
+            this.dispatchEvent(new Event('load'));
+            return;
+        }
+        return originalSend.apply(this, arguments);
+    };
+
+    // 3. CSS (Añadió object, embed para Flash)
+    const cssRules = `
+        object, embed, param { 
+            display: none !important; width: 0 !important; height: 0 !important; 
+        }
+        .ad-unit, .ad-zone, .ad-slot, .banner-ads, .advertisement, #ads,
+        div[id^="google_ads_"], div[id^="div-gpt-ad"],
+        div[class*="content_ad"], div[class*="sponsor"],
+        iframe[src*="googleads"], iframe[src*="doubleclick"], 
+        img[src*="advmaker"], img[src*="banner"], a[href*="/ad/"],
+        .video-ads, .ytp-ad-module, .ytp-ad-overlay-container,
+        ytd-ad-slot-renderer, ytd-rich-item-renderer[is-ad]
+        { display: none !important; width: 0 !important; height: 0 !important; }
+    `;
+
+    // 4. ROBOT con Cazador de Tamaños (NUEVO EN v7 - POSIBLE CULPABLE)
+    setInterval(() => {
+        // ... YouTube skip ...
+        
+        // Cazador de Tamaños - PUEDE SER MUY AGRESIVO
+        document.querySelectorAll('div, span, iframe').forEach(el => {
+            if (el.offsetParent !== null) {
+                const w = el.offsetWidth;
+                const h = el.offsetHeight;
+                if ((w === 728 && h === 90) ||   // Leaderboard
+                    (w === 300 && h === 250) ||  // Medium Rectangle
+                    (w === 160 && h === 600) ||  // Skyscraper
+                    (w === 468 && h === 60))     // Banner
+                {
+                    if (!el.innerText || el.innerText.length < 20) {
+                        el.style.display = 'none';  // <-- Puede ocultar cosas del test
+                    }
+                }
+            }
+        });
+    }, 300);
+
+    // 5. ANTI-POPUPS
+    window.open = function() { return null; };
+})();
+
+================================================================================
+                    RECOMENDACIÓN: VOLVER A v6
+================================================================================
+
+La v6 tenía 53 puntos. Los cambios de v7 que posiblemente rompieron:
+
+1. Script Sniper - Eliminar scripts puede confundir al test
+2. Cazador de Tamaños - Puede ocultar elementos que el test necesita
+
+SUGERENCIA: Restaurar v6 exacta (que tenía 53 puntos) y NO añadir:
+- Script Sniper
+- Cazador de Tamaños por dimensiones
+
+================================================================================
+                    CÓDIGO RUST COMPLETO (lib.rs v7)
+================================================================================
+
+use serde::Serialize;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use tauri::{Emitter, Manager, WebviewUrl};
+
+struct TabManager {
+    tabs: HashMap<String, String>,
+    active_tab: Option<String>,
+    counter: u32,
+}
+
+impl TabManager {
+    fn new() -> Self {
+        Self { tabs: HashMap::new(), active_tab: None, counter: 0 }
+    }
+    fn new_id(&mut self) -> String {
+        self.counter += 1;
+        format!("tab-{}", self.counter)
+    }
+}
+
+type TabState = Arc<Mutex<TabManager>>;
+
+#[derive(Clone, Serialize)]
+struct TabInfo { id: String, url: String }
+
+const ATOM_SHIELD_SCRIPT: &str = r#"..."#; // Script mostrado arriba
+
+// Comandos: create_tab, close_tab, switch_tab, navigate, go_back, go_forward, reload, get_active_tab
+// setup() crea webview inicial con script inyectado
+// Resize listener para ajustar webviews
+
+================================================================================
