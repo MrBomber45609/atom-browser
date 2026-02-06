@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atom - Nueva pestaña</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(180deg, #0a0a0b 0%, #151517 100%);
+      color: #e8e8e9;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+    }
+
+    .shortcuts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 24px;
+      margin: 0 auto;
+      max-width: 800px;
+    }
+
+    .shortcut {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 0.2s ease;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .shortcut:hover {
+      transform: translateY(-4px);
+    }
+
+    .shortcut-icon {
+      width: 80px;
+      height: 80px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .shortcut:hover .shortcut-icon {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .shortcut-icon img {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+    }
+
+    .shortcut-title {
+      font-size: 13px;
+      font-weight: 400;
+      color: #a8a8aa;
+      text-align: center;
+      max-width: 120px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .shortcut.add-shortcut .shortcut-icon {
+      background: rgba(107, 158, 255, 0.1);
+      border-color: rgba(107, 158, 255, 0.3);
+    }
+
+    .shortcut.add-shortcut:hover .shortcut-icon {
+      background: rgba(107, 158, 255, 0.15);
+      border-color: rgba(107, 158, 255, 0.4);
+    }
+
+    .shortcut.add-shortcut .shortcut-title {
+      color: #6b9eff;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: -8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(255, 107, 107, 0.9);
+      border: 2px solid #0a0a0b;
+      color: white;
+      font-size: 16px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      z-index: 10;
+    }
+
+    .shortcut:hover .delete-btn {
+      display: flex;
+    }
+
+    .delete-btn:hover {
+      background: #ff6b6b;
+      transform: scale(1.1);
+    }
+
+    /* Modal para agregar atajo */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+
+    .modal-content {
+      background: rgba(26, 26, 29, 0.95);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 32px;
+      width: 90%;
+      max-width: 420px;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .modal-header {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      color: #e8e8e9;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #a8a8aa;
+      margin-bottom: 8px;
+    }
+
+    .form-input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+      color: #e8e8e9;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .form-input:focus {
+      border-color: rgba(107, 158, 255, 0.5);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 0 3px rgba(107, 158, 255, 0.1);
+    }
+
+    .form-input::placeholder {
+      color: #4a4a4c;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: #6b9eff;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5a8eef;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: #a8a8aa;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #e8e8e9;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="shortcuts-grid" id="shortcuts-grid">
+      <!-- Los atajos se cargarán dinámicamente -->
+      <div class="shortcut add-shortcut" id="add-shortcut-btn">
+        <div class="shortcut-icon">+</div>
+        <div class="shortcut-title">Add shortcut</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para agregar atajo -->
+  <div class="modal" id="add-modal">
+    <div class="modal-content">
+      <h2 class="modal-header">Add shortcut</h2>
+      <form id="shortcut-form">
+        <div class="form-group">
+          <label class="form-label" for="shortcut-name">Name</label>
+          <input type="text" id="shortcut-name" class="form-input" placeholder="e.g. Google" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="shortcut-url">URL</label>
+          <input type="url" id="shortcut-url" class="form-input" placeholder="e.g. https://google.com" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const SHORTCUTS_KEY = 'atom-shortcuts';
+    const shortcutsGrid = document.getElementById('shortcuts-grid');
+    const addShortcutBtn = document.getElementById('add-shortcut-btn');
+    const addModal = document.getElementById('add-modal');
+    const shortcutForm = document.getElementById('shortcut-form');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const nameInput = document.getElementById('shortcut-name');
+    const urlInput = document.getElementById('shortcut-url');
+
+    // Cargar atajos desde localStorage
+    function loadShortcuts() {
+      const shortcuts = JSON.parse(localStorage.getItem(SHORTCUTS_KEY) || '[]');
+      return shortcuts;
+    }
+
+    // Guardar atajos en localStorage
+    function saveShortcuts(shortcuts) {
+      localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(shortcuts));
+    }
+
+    // Obtener favicon de una URL
+    function getFavicon(url) {
+      try {
+        const urlObj = new URL(url);
+        return `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=64`;
+      } catch {
+        return '';
+      }
+    }
+
+    // Renderizar atajos
+    function renderShortcuts() {
+      const shortcuts = loadShortcuts();
+
+      // Limpiar grid (excepto el botón de agregar)
+      shortcutsGrid.innerHTML = '';
+
+      // Agregar atajos
+      shortcuts.forEach((shortcut, index) => {
+        const shortcutEl = document.createElement('a');
+        shortcutEl.className = 'shortcut';
+        shortcutEl.href = shortcut.url;
+        shortcutEl.setAttribute('data-index', index);
+
+        const favicon = getFavicon(shortcut.url);
+
+        shortcutEl.innerHTML = `
+          <div class="shortcut-icon">
+            <img src="${favicon}" alt="${shortcut.name}" onerror="this.style.display='none'; this.parentElement.textContent='🔗'">
+          </div>
+          <div class="shortcut-title">${shortcut.name}</div>
+          <button class="delete-btn" onclick="deleteShortcut(${index}); event.preventDefault(); event.stopPropagation();">×</button>
+        `;
+
+        shortcutsGrid.appendChild(shortcutEl);
+      });
+
+      // Agregar botón de "Add shortcut" al final
+      shortcutsGrid.appendChild(addShortcutBtn);
+    }
+
+    // Agregar atajo
+    function addShortcut(name, url) {
+      // Asegurar que la URL tenga protocolo
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+
+      const shortcuts = loadShortcuts();
+      shortcuts.push({ name, url });
+      saveShortcuts(shortcuts);
+      renderShortcuts();
+    }
+
+    // Eliminar atajo
+    function deleteShortcut(index) {
+      const shortcuts = loadShortcuts();
+      shortcuts.splice(index, 1);
+      saveShortcuts(shortcuts);
+      renderShortcuts();
+    }
+
+    // Hacer deleteShortcut global
+    window.deleteShortcut = deleteShortcut;
+
+    // Mostrar modal
+    addShortcutBtn.addEventListener('click', () => {
+      addModal.classList.add('active');
+      nameInput.focus();
+    });
+
+    // Cerrar modal
+    cancelBtn.addEventListener('click', () => {
+      addModal.classList.remove('active');
+      shortcutForm.reset();
+    });
+
+    // Cerrar modal al hacer clic fuera
+    addModal.addEventListener('click', (e) => {
+      if (e.target === addModal) {
+        addModal.classList.remove('active');
+        shortcutForm.reset();
+      }
+    });
+
+    // Manejar envío del formulario
+    shortcutForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = nameInput.value.trim();
+      const url = urlInput.value.trim();
+
+      if (name && url) {
+        addShortcut(name, url);
+        addModal.classList.remove('active');
+        shortcutForm.reset();
+      }
+    });
+
+    // Cerrar modal con ESC
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && addModal.classList.contains('active')) {
+        addModal.classList.remove('active');
+        shortcutForm.reset();
+      }
+    });
+
+    // Inicializar
+    renderShortcuts();
+
+    // Si no hay atajos, agregar algunos por defecto
+    if (loadShortcuts().length === 0) {
+      const defaultShortcuts = [
+        { name: 'Google', url: 'https://google.com' },
+        { name: 'YouTube', url: 'https://youtube.com' },
+        { name: 'GitHub', url: 'https://github.com' },
+      ];
+      saveShortcuts(defaultShortcuts);
+      renderShortcuts();
+    }
+  </script>
+</body>
+</html>

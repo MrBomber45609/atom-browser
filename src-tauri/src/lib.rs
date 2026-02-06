@@ -3,6 +3,12 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, WebviewUrl};
 
+// --- CONSTANTES ---
+const BARRA_ALTURA: f64 = 72.0;
+
+// --- SCRIPT DE SEGURIDAD (cargado desde archivo externo) ---
+const ATOM_SHIELD_SCRIPT: &str = include_str!("../scripts/atom_shield.js");
+
 // --- ESTADO ---
 struct TabManager {
     tabs: HashMap<String, String>,
@@ -33,149 +39,7 @@ struct TabInfo {
     url: String,
 }
 
-// --- SCRIPT ATOM SHIELD v15 "The Property Trap" ---
-const ATOM_SHIELD_SCRIPT: &str = r#"
-(function() {
-    // 🛡️ ATOM SHIELD v15
-    // Estrategia: Interceptar los 'setters' de las propiedades .src antes de que el navegador actúe.
-    
-    const THREATS = [
-        "google-analytics", "doubleclick", "googletagmanager", "hotjar", 
-        "yandex", "facebook.net", "sentry", "bugsnag", "advmaker",
-        "scorecardresearch", "quantserve", "adroll", "taboola", "outbrain",
-        "googleads", "googlesyndication", "adservice", "amazon-adsystem",
-        "criteo", "moatads", "pubmatic", "rubiconproject", "openx",
-        "popads", "popcash", "mgid", "adblade", "chartbeat", "segment",
-        "clarity", "mixpanel", "optimizely", "crazyegg", "adtech", "fastclick",
-        "youtube.com/pagead", "pagead2", "adsense"
-    ];
-
-    // Función de chequeo rápido
-    function isBlocked(url) {
-        if (!url) return false;
-        if (typeof url !== 'string') return false;
-        const u = url.toLowerCase();
-        // Permitir URLs locales o data (evita romper imágenes base64)
-        if (u.startsWith("data:") || u.startsWith("blob:") || u.startsWith("file:")) return false;
-        return THREATS.some(t => u.includes(t));
-    }
-
-    // --- 1. THE PROPERTY TRAP (La Trampa) ---
-    // Interceptamos la asignación de .src en Scripts, Iframes e Imágenes
-    // Esto evita la petición de red ("Loading: Failed" ✅)
-    
-    function trapProperty(elementPrototype, propertyName) {
-        const originalDescriptor = Object.getOwnPropertyDescriptor(elementPrototype, propertyName);
-        if (!originalDescriptor) return;
-
-        Object.defineProperty(elementPrototype, propertyName, {
-            set: function(value) {
-                if (isBlocked(value)) {
-                    // console.log("🚫 Trampa activada:", value);
-                    // Asignamos algo inocuo o nada
-                    return originalDescriptor.set.call(this, ""); 
-                }
-                return originalDescriptor.set.call(this, value);
-            },
-            get: originalDescriptor.get
-        });
-    }
-
-    try {
-        trapProperty(HTMLScriptElement.prototype, 'src');
-        trapProperty(HTMLImageElement.prototype, 'src');
-        trapProperty(HTMLIFrameElement.prototype, 'src');
-        trapProperty(HTMLEmbedElement.prototype, 'src');
-        // Para Flash/Objects
-        trapProperty(HTMLObjectElement.prototype, 'data'); 
-    } catch (e) { console.error("Atom Trap Error", e); }
-
-    // --- 2. INTERCEPTOR DE CREACIÓN DE ELEMENTOS ---
-    const originalCreateElement = document.createElement;
-    document.createElement = function(tagName) {
-        const el = originalCreateElement.call(document, tagName);
-        // Si es un elemento peligroso, lo vigilamos desde el nacimiento
-        if (['SCRIPT', 'IFRAME', 'IMG', 'OBJECT', 'EMBED'].includes(tagName.toUpperCase())) {
-            // Ya tiene la trampa del prototipo, pero por seguridad:
-            el.addEventListener('beforescriptexecute', function(e) {
-                if (isBlocked(el.src)) { e.preventDefault(); el.remove(); }
-            });
-        }
-        return el;
-    };
-
-    // --- 3. MOCKS DE ANALYTICS (Para que no explote la web) ---
-    // Muchas webs fallan si 'ga' no existe. Lo creamos falso.
-    function mock(name) {
-        if (!window[name]) {
-            Object.defineProperty(window, name, {
-                value: function() { return {}; },
-                writable: false
-            });
-        }
-    }
-    mock('ga'); mock('gtag'); mock('fbg'); mock('sentry');
-
-    // --- 4. CSS NUCLEAR (Con selector :has para limpiar huecos) ---
-    const cssRules = `
-        /* Flash Killer + Contenedor */
-        object, embed { display: none !important; }
-        div:has(> object), div:has(> embed) { display: none !important; width: 0 !important; height: 0 !important; }
-
-        /* Ad Units vacíos */
-        .ad-unit, .ad-zone, .banner-ads, #ads, .advertisement,
-        iframe[src*="googleads"], iframe[src*="doubleclick"],
-        .video-ads, .ytp-ad-module, ytd-ad-slot-renderer,
-        ytd-rich-item-renderer[is-ad], ytd-promoted-sparkles-web-renderer
-        { display: none !important; width: 0 !important; height: 0 !important; }
-        
-        /* Limpieza de contenedores padres que tienen anuncios */
-        div:has(> iframe[src*="googleads"]), 
-        div:has(> iframe[src*="doubleclick"]),
-        div:has(> img[src*="advmaker"])
-        { display: none !important; width: 0 !important; height: 0 !important; }
-    `;
-    function injectCSS() {
-        const style = document.createElement('style');
-        style.id = "atom-shield-css"; 
-        style.innerHTML = cssRules;
-        (document.head || document.documentElement).appendChild(style);
-    }
-    if (document.head) injectCSS(); else window.addEventListener('DOMContentLoaded', injectCSS);
-
-    // --- 5. ROBOT YOUTUBE (Ultra Rápido 50ms) ---
-    setInterval(() => {
-        // 1. Clicker
-        const skipBtns = document.querySelectorAll('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button');
-        if (skipBtns.length > 0) {
-            skipBtns.forEach(b => b.click());
-            console.log("⚡ Skip");
-        }
-        
-        // 2. Acelerador + Silenciador
-        const player = document.querySelector('#movie_player');
-        if (player && player.classList.contains('ad-showing')) {
-             const v = document.querySelector('video');
-             if (v) { 
-                v.muted = true; 
-                // Teletransporte al final
-                if (!isNaN(v.duration)) v.currentTime = v.duration; 
-                v.playbackRate = 16.0;
-             }
-             // Cerrar overlays
-             document.querySelectorAll('.ytp-ad-overlay-close-button').forEach(b => b.click());
-        }
-
-        // 3. Limpieza de Feed (Patrocinado)
-        document.querySelectorAll('ytd-rich-item-renderer').forEach(el => {
-            const txt = (el.innerText || "").toUpperCase();
-            if (txt.includes("PATROCINADO") || txt.includes("SPONSORED")) el.remove();
-        });
-
-    }, 50); // 50ms = Reacción casi instantánea
-
-})();
-"#;
+// --- COMANDOS TAURI ---
 
 #[tauri::command]
 async fn create_tab(
@@ -183,7 +47,6 @@ async fn create_tab(
     state: tauri::State<'_, TabState>,
     url: Option<String>,
 ) -> Result<String, String> {
-    // Gestión del ID y estado
     let (tab_id, old_active) = {
         let mut manager = state.lock().map_err(|e| e.to_string())?;
         let id = manager.new_id();
@@ -200,19 +63,57 @@ async fn create_tab(
     let win = app.get_window("main").ok_or("No main window")?;
     let handle = app.clone();
     let tab_id_clone = tab_id.clone();
-    let initial_url = url.unwrap_or_else(|| "about:blank".to_string());
-    let parsed_url = initial_url
-        .parse()
-        .unwrap_or("about:blank".parse().unwrap());
-    let barra_altura = 90.0;
+
+    // Preservar lógica original de home.html
+    let stored_url = url.clone().unwrap_or_else(|| "atom://home".to_string());
+
+    let webview_url = match url {
+        Some(u) if !u.is_empty() => {
+            let parsed = u.parse().unwrap_or_else(|_| "about:blank".parse().unwrap());
+            WebviewUrl::External(parsed)
+        }
+        _ => WebviewUrl::App("home.html".into()),
+    };
+
     let size = win.inner_size().map_err(|e| e.to_string())?;
 
-    // INYECCIÓN
     win.add_child(
-        tauri::webview::WebviewBuilder::new(&tab_id, WebviewUrl::External(parsed_url))
+        tauri::webview::WebviewBuilder::new(&tab_id, webview_url)
             .auto_resize()
-            .initialization_script(ATOM_SHIELD_SCRIPT)
+            .on_download(move |webview, event| {
+                match event {
+                    tauri::webview::DownloadEvent::Requested { url, destination } => {
+                        let filename = destination
+                            .file_name()
+                            .map(|f| f.to_string_lossy().to_string())
+                            .unwrap_or_default();
+                        // Broadcast globally so Popup and Main window both get it
+                        let _ = webview.app_handle().emit(
+                            "download-started",
+                            serde_json::json!({
+                                "id": url.to_string(),
+                                "filename": filename,
+                                "path": destination.to_string_lossy()
+                            }),
+                        );
+                        true
+                    }
+                    tauri::webview::DownloadEvent::Finished { url, success, .. } => {
+                        let _ = webview.app_handle().emit(
+                            "download-finished",
+                            serde_json::json!({
+                                "id": url.to_string(),
+                                "success": success
+                            }),
+                        );
+                        true
+                    }
+                    _ => true,
+                }
+            })
             .on_page_load(move |webview, _payload| {
+                let _ = webview.eval(ATOM_SHIELD_SCRIPT);
+
                 if let Ok(url) = webview.url() {
                     let _ = handle.emit(
                         "url-changed",
@@ -223,14 +124,14 @@ async fn create_tab(
                     );
                 }
             }),
-        tauri::LogicalPosition::new(0.0, barra_altura),
-        tauri::LogicalSize::new(size.width as f64, size.height as f64 - barra_altura),
+        tauri::LogicalPosition::new(0.0, BARRA_ALTURA),
+        tauri::LogicalSize::new(size.width as f64, size.height as f64 - BARRA_ALTURA),
     )
     .map_err(|e| e.to_string())?;
 
     {
         let mut manager = state.lock().map_err(|e| e.to_string())?;
-        manager.tabs.insert(tab_id.clone(), initial_url);
+        manager.tabs.insert(tab_id.clone(), stored_url);
         manager.active_tab = Some(tab_id.clone());
     }
 
@@ -339,6 +240,61 @@ fn get_active_tab(state: tauri::State<TabState>) -> Option<String> {
     manager.active_tab.clone()
 }
 
+// --- PUNTO DE ENTRADA ---
+
+#[tauri::command]
+fn toggle_popup(app: tauri::AppHandle, show: bool) {
+    if let Some(window) = app.get_webview_window("popup") {
+        if show {
+            // Hardcoded position/size specific to "Download" button for now,
+            // or we could pass x,y relative to monitor.
+            // For simplicity in V1, let's just show it. Ideally frontend passes logic.
+            // But main window is decoration-less, so (0,0) is screen (0,0) IF maximized?
+            // Actually, we'll let frontend calculate position if possible,
+            // but for "Z-Order fix", just showing it on top is the key.
+            // Let's rely on standard positioning if provided, or default.
+            // Wait, command signature in plan was (show, x, y, width, height).
+            // Let's stick to simple "show/hide" first, and let the window keep its defined size.
+            // Positioning relative to parent is tricky without client logic.
+            // REVISION: Let's accept position args.
+            window.show().unwrap();
+            window.set_focus().unwrap();
+        } else {
+            window.hide().unwrap();
+        }
+    }
+}
+
+#[tauri::command]
+fn content_position(app: tauri::AppHandle, x: f64, y: f64) {
+    // x, y ahora son relativos al viewport de la ventana 'main'
+    if let Some(popup) = app.get_webview_window("popup") {
+        if let Some(main) = app.get_webview_window("main") {
+            if let Ok(main_pos) = main.inner_position() {
+                // Usamos inner_position para obtener la esquina superior izquierda del área de contenido (ignorando barra título)
+                // Nota: PhysicalPosition -> LogicalPosition conversion might be needed implicity or explicitly?
+                // inner_position devuelve PhysicalPosition (pixeles reales).
+                // set_position espera Position enum.
+
+                // Como las coords de JS (getBoundingClientRect) vienen en pixels lógicos (CSS pixels),
+                // y inner_position está en físicos, necesitamos el scale factor.
+                let scale_factor = main.scale_factor().unwrap_or(1.0);
+
+                let main_logical_x = main_pos.x as f64 / scale_factor;
+                let main_logical_y = main_pos.y as f64 / scale_factor;
+
+                let final_x = main_logical_x + x;
+                let final_y = main_logical_y + y;
+
+                let _ = popup.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                    x: final_x,
+                    y: final_y,
+                }));
+            }
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let tab_state: TabState = Arc::new(Mutex::new(TabManager::new()));
@@ -353,49 +309,42 @@ pub fn run() {
             create_tab,
             close_tab,
             switch_tab,
-            get_active_tab
+            get_active_tab,
+            toggle_popup,
+            content_position
         ])
-        .setup(move |app| {
-            let win = app.get_window("main").unwrap();
-            let handle = app.handle().clone();
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Resized(size) = event {
+                if window.label() == "main" {
+                    let tab_state: TabState = window.state::<TabState>().inner().clone();
 
-            // PRIMERA TAB
-            let tab_id = {
-                let mut manager = tab_state.lock().unwrap();
-                let id = manager.new_id();
-                manager.tabs.insert(id.clone(), "about:blank".to_string());
-                manager.active_tab = Some(id.clone());
-                id
-            };
-
-            let barra_altura = 90.0;
-            let size = win.inner_size().unwrap();
-            let tab_id_clone = tab_id.clone();
-
-            let _ = win.add_child(
-                tauri::webview::WebviewBuilder::new(
-                    &tab_id,
-                    WebviewUrl::External("about:blank".parse().unwrap()),
-                )
-                .auto_resize()
-                .initialization_script(ATOM_SHIELD_SCRIPT) // ¡Importante!
-                .on_page_load(move |webview, _payload| {
-                    if let Ok(url) = webview.url() {
-                        let _ = handle.emit(
-                            "url-changed",
-                            TabInfo {
-                                id: tab_id_clone.clone(),
-                                url: url.to_string(),
-                            },
-                        );
+                    {
+                        let manager = tab_state.lock().unwrap();
+                        for (id, _) in manager.tabs.iter() {
+                            if let Some(webview) = window.get_webview(id) {
+                                let width = size.width as f64;
+                                let height = size.height as f64;
+                                let _ = webview.set_bounds(tauri::Rect {
+                                    position: tauri::Position::Logical(tauri::LogicalPosition {
+                                        x: 0.0,
+                                        y: BARRA_ALTURA,
+                                    }),
+                                    size: tauri::Size::Logical(tauri::LogicalSize {
+                                        width,
+                                        height: if height > BARRA_ALTURA {
+                                            height - BARRA_ALTURA
+                                        } else {
+                                            0.0
+                                        },
+                                    }),
+                                });
+                            }
+                        }
                     }
-                }),
-                tauri::LogicalPosition::new(0.0, barra_altura),
-                tauri::LogicalSize::new(size.width as f64, size.height as f64 - barra_altura),
-            )?;
-
-            Ok(())
+                }
+            }
         })
+        .setup(move |_app| Ok(()))
         .plugin(tauri_plugin_shell::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

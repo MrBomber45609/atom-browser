@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            background: #1e1e1e !important;
+            /* Debug: Dark background to see if it loads */
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 10px;
+            /* Space for shadow */
+            margin: 0;
+            color: #e0e0e0;
+            /* Fallback color */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* Override popup menu to be always visible relative to this window */
+        .popup-menu {
+            position: relative !important;
+            top: auto !important;
+            right: auto !important;
+            left: auto !important;
+            transform: none !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+            display: none;
+            /* Hidden by default, toggled by JS */
+        }
+
+        .popup-menu.active {
+            display: flex;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- DOWNLOADS CONTAINER -->
+    <div id="downloads-popup" class="popup-menu active">
+        <div class="popup-header">
+            <h3>Descargas recientes</h3>
+            <div class="popup-actions">
+                <button id="btn-clear-downloads" title="Limpiar todo">🗑️</button>
+            </div>
+        </div>
+        <div id="downloads-list">
+            <div class="empty-state">Cargando...</div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

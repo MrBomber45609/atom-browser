@@ -11,6 +11,7 @@ const btnRefresh = document.getElementById("btn-refresh");
 const btnNewTab = document.getElementById("btn-new-tab");
 const btnAdblock = document.getElementById("btn-adblock");
 const btnBookmark = document.getElementById("btn-bookmark");
+const btnDownloads = document.getElementById("btn-downloads"); // [NEW]
 const btnMenu = document.getElementById("btn-menu");
 const tabsContainer = document.getElementById("tabs-container");
 const progressBar = document.getElementById("progress-bar");
@@ -30,6 +31,12 @@ const btnClearHistory = document.getElementById("btn-clear-history");
 const bookmarksOverlay = document.getElementById("bookmarks-overlay");
 const bookmarksList = document.getElementById("bookmarks-list");
 const btnCloseBookmarks = document.getElementById("btn-close-bookmarks");
+
+// Downloads Overlay
+const downloadsOverlay = document.getElementById("downloads-overlay");
+const downloadsList = document.getElementById("downloads-list");
+const btnCloseDownloads = document.getElementById("btn-close-downloads");
+const btnClearDownloads = document.getElementById("btn-clear-downloads");
 
 // Search Engine Overlay
 const searchEngineOverlay = document.getElementById("search-engine-overlay");
@@ -91,7 +98,8 @@ async function createTab(url = null) {
     const tabEl = createTabElement(tabId, true);
 
     document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-    tabsContainer.appendChild(tabEl);
+    // Insertar antes del botón de nueva pestaña
+    tabsContainer.insertBefore(tabEl, btnNewTab);
     activeTabId = tabId;
     urlInput.value = "";
     urlInput.focus();
@@ -147,14 +155,21 @@ function updateTabInfo(tabId, url) {
 
   const tabEl = document.querySelector(`[data-tab-id="${tabId}"]`);
   if (tabEl) {
-    try {
-      const urlObj = new URL(url);
-      const domain = urlObj.hostname.replace("www.", "");
-      tabEl.querySelector(".tab-title").textContent = domain || "Nueva pestaña";
-      tabEl.querySelector(".tab-favicon").src = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
-      tabEl.title = url;
-    } catch {
+    // Manejar página de inicio
+    if (url === 'atom://home' || url.includes('home.html')) {
       tabEl.querySelector(".tab-title").textContent = "Nueva pestaña";
+      tabEl.querySelector(".tab-favicon").src = "ico.png";
+      tabEl.title = "Nueva pestaña";
+    } else {
+      try {
+        const urlObj = new URL(url);
+        const domain = urlObj.hostname.replace("www.", "");
+        tabEl.querySelector(".tab-title").textContent = domain || "Nueva pestaña";
+        tabEl.querySelector(".tab-favicon").src = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
+        tabEl.title = url;
+      } catch {
+        tabEl.querySelector(".tab-title").textContent = "Nueva pestaña";
+      }
     }
   }
 
@@ -185,30 +200,75 @@ function handleNavigation() {
 
 // --- HISTORIAL ---
 
+// --- UTILIDADES ---
+// Función Debounce para optimizar escritura en disco
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// --- HISTORIAL OPTIMIZADO ---
+
+// Guardamos en memoria inmediatamente, pero en disco cada 2 segundos máximo
+const saveToHistoryDisk = debounce((history) => {
+  localStorage.setItem("atom-history", JSON.stringify(history.slice(0, 100)));
+}, 2000);
+
 function saveToHistory(url) {
   if (isPrivateMode) return;
-  if (!url || url === "about:blank") return;
+  if (!url || url === "about:blank" || url.startsWith("atom://")) return;
+
+  // Leemos, actualizamos memoria
   const history = JSON.parse(localStorage.getItem("atom-history") || "[]");
+
+  // Evitar duplicados consecutivos
   if (history[0]?.url === url) return;
+
   history.unshift({ url, time: Date.now() });
-  localStorage.setItem("atom-history", JSON.stringify(history.slice(0, 100)));
+
+  // Disparamos el guardado optimizado
+  saveToHistoryDisk(history);
 }
 
 // --- LOADING ---
 
+// --- LOADING MEJORADO ---
+let loadingTimeout;
+
 function startLoading() {
+  clearTimeout(loadingTimeout);
+  progressBar.classList.remove("complete");
+  progressBar.style.width = "0%";
+  // Forzar reflow para reiniciar animación
+  void progressBar.offsetWidth;
   progressBar.classList.add("loading");
   btnRefresh.classList.add("loading");
+
+  // Fallback: Si por alguna razón no recibimos evento de carga terminada, parar a los 10s
+  loadingTimeout = setTimeout(stopLoading, 10000);
 }
 
 function stopLoading() {
+  clearTimeout(loadingTimeout);
   progressBar.classList.remove("loading");
-  progressBar.classList.add("complete");
-  btnRefresh.classList.remove("loading");
+  progressBar.style.width = "100%"; // Llenar visualmente
+
   setTimeout(() => {
-    progressBar.classList.remove("complete");
-    progressBar.style.width = "0%";
-  }, 500);
+    progressBar.classList.add("complete"); // Desvanecer
+    btnRefresh.classList.remove("loading");
+    // Resetear después de la animación de desvanecimiento
+    setTimeout(() => {
+      progressBar.style.width = "0%";
+      progressBar.classList.remove("complete");
+    }, 300);
+  }, 200);
 }
 
 // --- ESCUCHAR CAMBIOS DE URL ---
@@ -227,6 +287,13 @@ listen('url-changed', (event) => {
 
 // --- URL BAR ESTILO HELIUM (mostrar solo dominio) ---
 function showDomainOnly(url) {
+  // Manejar página de inicio
+  if (url === 'atom://home' || url.includes('home.html')) {
+    urlInput.value = '';
+    urlInput.dataset.fullUrl = '';
+    return;
+  }
+
   try {
     const urlObj = new URL(url);
     urlInput.value = urlObj.hostname.replace('www.', '');
@@ -419,7 +486,7 @@ function updateBookmarkStar() {
 
 function renderBookmarks() {
   const bookmarks = getBookmarks();
-  bookmarksList.innerHTML = bookmarks.length ? "" : '<div style="padding: 20px; text-align: center; opacity: 0.5">Sin marcadores</div>';
+  bookmarksList.innerHTML = bookmarks.length ? "" : '<div class="empty-state">Sin marcadores</div>';
 
   bookmarks.forEach(b => {
     const item = document.createElement("div");
@@ -444,25 +511,41 @@ function renderBookmarks() {
 }
 
 // --- HISTORIAL OVERLAY ---
+// --- RENDERIZADO EFICIENTE ---
 function renderHistory() {
   const history = JSON.parse(localStorage.getItem("atom-history") || "[]");
-  historyList.innerHTML = history.length ? "" : '<div style="padding: 20px; text-align: center; opacity: 0.5">Sin historial</div>';
 
-  history.forEach(h => {
+  // Usamos DocumentFragment para una sola reflow del DOM (Más rápido)
+  const fragment = document.createDocumentFragment();
+
+  if (history.length === 0) {
+    historyList.innerHTML = '<div class="empty-state">Sin historial</div>';
+    return;
+  }
+
+  // Limitamos renderizado visual a 50 items para mantener la UI fluida
+  history.slice(0, 50).forEach(h => {
     const item = document.createElement("div");
     item.className = "history-item";
     const date = new Date(h.time);
     const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    // Sanitización básica de URL para evitar XSS visual
+    const safeUrl = h.url.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
     item.innerHTML = `
-      <span class="url">${h.url}</span>
+      <span class="url">${safeUrl}</span>
       <span class="time">${timeStr}</span>
     `;
     item.addEventListener("click", () => {
       invoke("navigate", { url: h.url });
       historyOverlay.classList.add("hidden");
     });
-    historyList.appendChild(item);
+    fragment.appendChild(item);
   });
+
+  historyList.innerHTML = "";
+  historyList.appendChild(fragment);
 }
 
 // --- EVENTOS DE OVERLAYS ---
@@ -503,18 +586,128 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     toggleBookmark();
   }
+  // Ctrl+J para descargas
+  if (e.ctrlKey && e.key === "j") {
+    e.preventDefault();
+    renderDownloads();
+    downloadsOverlay.classList.toggle("hidden");
+  }
 });
+
+// --- GESTOR DE DESCARGAS ---
+const downloads = new Map(); // id -> { filename, path, total, current, state: 'progress'|'finished'|'error' }
+
+function getDownloadsHistory() {
+  return JSON.parse(localStorage.getItem("atom-downloads") || "[]");
+}
+
+function saveDownloadsHistory(list) {
+  localStorage.setItem("atom-downloads", JSON.stringify(list.slice(0, 50)));
+}
+
+function updateDownloadBtn() {
+  const history = getDownloadsHistory();
+  if (history.length > 0 || downloads.size > 0) {
+    btnDownloads.classList.remove("hidden");
+  } else {
+    btnDownloads.classList.add("hidden");
+  }
+
+  // Animation if any active download
+  const hasActive = Array.from(downloads.values()).some(d => d.state === 'progress');
+  if (hasActive) {
+    btnDownloads.classList.add("downloading");
+  } else {
+    btnDownloads.classList.remove("downloading");
+  }
+}
+
+// Send data to Popup Window
+async function syncPopupData() {
+  const history = getDownloadsHistory();
+  const active = Array.from(downloads.values()).reverse();
+  const all = [...active, ...history].slice(0, 50);
+
+  // Emit event globally so Popup picks it up
+  await window.__TAURI__.event.emit("render-downloads", { downloads: all });
+}
+
+// Event Listeners for Downloads
+btnDownloads.addEventListener("click", async () => {
+  // Obtener rectángulo del botón relativo al viewport
+  const rect = btnDownloads.getBoundingClientRect();
+
+  // Coordenadas relativas a la esquina superior izquierda del área de contenido (viewport)
+  // Queremos alinear el borde derecho del popup con el borde derecho del botón:
+  const popupWidth = 380; // Debe coincidir con CSS/Tauri config
+  const relativeX = rect.right - popupWidth;
+  const relativeY = rect.bottom + 5; // Un pequeño margen vertical
+
+  // Send data first
+  await syncPopupData();
+
+  // Move (sending relative coords) and Show
+  await invoke("content_position", { x: relativeX, y: relativeY });
+  await invoke("toggle_popup", { show: true });
+});
+
+// We don't need local overlay logic anymore for downloads
+// btnCloseDownloads... etc removal or ignore
+// We still listen to events to update Badge/Button state
+listen('download-started', (event) => {
+  const { id, filename, path } = event.payload;
+  downloads.set(id, { id, filename, path, current: 0, total: 0, state: 'progress' });
+  updateDownloadBtn();
+  syncPopupData();
+});
+
+listen('download-progress', (event) => {
+  const { id, current, total } = event.payload;
+  const d = downloads.get(id);
+  if (d) {
+    d.current = current;
+    d.total = total;
+    syncPopupData(); // Realtime update popup
+  }
+});
+
+listen('download-finished', (event) => {
+  const { id, success } = event.payload;
+  const d = downloads.get(id);
+  if (d) {
+    d.state = success ? 'finished' : 'error';
+    const history = getDownloadsHistory();
+    const existingIdx = history.findIndex(x => x.id === id);
+    if (existingIdx >= 0) history.splice(existingIdx, 1);
+
+    history.unshift(d);
+    saveDownloadsHistory(history);
+    downloads.delete(id);
+    updateDownloadBtn();
+    syncPopupData();
+  }
+});
+
+// Inicializar botón
+updateDownloadBtn();
 
 // --- INICIALIZACIÓN ---
 async function init() {
   try {
-    const tabId = await invoke("get_active_tab");
+    let tabId = await invoke("get_active_tab");
     console.log("Tab inicial:", tabId);
+
+    if (!tabId) {
+      await createTab(); // Crea pestaña por defecto (home)
+      return;
+    }
+
     if (tabId) {
       tabs.set(tabId, { url: "about:blank", title: "Nueva pestaña" });
       activeTabId = tabId;
       const tabEl = createTabElement(tabId, true);
-      tabsContainer.appendChild(tabEl);
+      // Insertar antes del botón de nueva pestaña
+      tabsContainer.insertBefore(tabEl, btnNewTab);
     }
   } catch (error) {
     console.error("Error inicializando:", error);

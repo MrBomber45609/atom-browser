@@ -4,7 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Atom</title>
+  <meta name="description" content="Atom Browser - Navegador web minimalista y r\u00e1pido">
+  <title>Atom Browser</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 
@@ -15,8 +16,9 @@
   <!-- Barra de título / Pestañas -->
   <div id="title-bar" data-tauri-drag-region>
     <img src="ico.png" alt="Atom" id="browser-icon">
-    <div id="tabs-container"></div>
-    <button id="btn-new-tab" title="Nueva pestaña">+</button>
+    <div id="tabs-container">
+      <button id="btn-new-tab" title="Nueva pestaña">+</button>
+    </div>
   </div>
 
   <!-- Barra de control unificada -->
@@ -32,6 +34,16 @@
 
     <!-- Ad-blocker siempre activo -->
     <button id="btn-adblock" class="active" title="Atom Shield: Siempre Activo">🛡</button>
+
+    <!-- Descargas (oculto por defecto) -->
+    <button id="btn-downloads" class="hidden" title="Descargas">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    </button>
 
     <!-- Menú de 3 puntos -->
     <button id="btn-menu" title="Menú">⋮</button>
@@ -95,6 +107,20 @@
         <button id="btn-close-bookmarks" class="overlay-close">✕</button>
       </div>
       <div id="bookmarks-list"></div>
+    </div>
+  </div>
+
+  <!-- Overlay de Descargas (Estilo Popup) -->
+  <div id="downloads-overlay" class="popup-menu hidden">
+    <div class="popup-header">
+      <h3>Descargas recientes</h3>
+      <div class="popup-actions">
+        <button id="btn-clear-downloads" title="Limpiar todo">🗑️</button>
+        <button id="btn-close-downloads" title="Cerrar">✕</button>
+      </div>
+    </div>
+    <div id="downloads-list">
+      <div class="empty-state">No hay descargas recientes</div>
     </div>
   </div>
 
