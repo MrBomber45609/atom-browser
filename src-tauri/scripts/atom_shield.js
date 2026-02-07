@@ -7,16 +7,12 @@
     // 1. DOMAIN THREATS
     // ================================================================
     var DOMAIN_THREATS = [
-        // Ads - Google
         "doubleclick.net", "googlesyndication.com", "googleadservices.com",
         "googletagmanager.com", "google-analytics.com", "pagead2.googlesyndication",
         "adservice.google", "googletagservices.com", "partner.googleadservices",
         "tpc.googlesyndication",
-        // Ads - Amazon
         "amazon-adsystem.com", "aax.amazon",
-        // Ads - Facebook
         "facebook.net/en_US/fbevents", "connect.facebook.net",
-        // Ads - Networks
         "advmaker", "adroll.com", "taboola.com", "outbrain.com",
         "popads.net", "popcash.net", "mgid.com", "adblade.com",
         "adnxs.com", "adsrvr.org", "ad-delivery", "adform.net",
@@ -38,7 +34,6 @@
         "2mdn.net", "serving-sys.com", "innovid.com",
         "aniview.com", "springserve.com", "connatix.com",
         "adsafeprotected.com",
-        // Analytics
         "hotjar.com", "static.hotjar.com", "script.hotjar.com",
         "mixpanel.com", "cdn.mxpnl.com",
         "segment.com", "cdn.segment.com", "api.segment.io",
@@ -51,8 +46,7 @@
         "quantserve.com", "pixel.quantserve.com",
         "chartbeat.com", "static.chartbeat.com",
         "parsely.com", "cdn.parsely.com",
-        "matomo.cloud", "piwik.pro",
-        "kissmetrics.com",
+        "matomo.cloud", "piwik.pro", "kissmetrics.com",
         "clarity.ms",
         "newrelic.com", "js-agent.newrelic.com", "bam.nr-data.net",
         "stats.wp.com",
@@ -65,29 +59,24 @@
         "omtrdc.net", "demdex.net", "everesttech.net",
         "2o7.net", "omniture.com",
         "bluekai.com", "exelator.com", "krxd.net",
-        // Error monitoring
-        "sentry.io", "browser.sentry-cdn.com", "sentry-cdn.com",
-        "js.sentry-cdn.com",
+        "sentry.io", "browser.sentry-cdn.com", "sentry-cdn.com", "js.sentry-cdn.com",
         "bugsnag.com", "d2wy8f7a9ursnm.cloudfront.net",
         "raygun.com", "raygun.io", "rollbar.com",
         "logrocket.com", "cdn.logrocket.io", "cdn.lr-ingest.io",
         "trackjs.com", "errorception.com",
         "airbrake.io", "honeybadger.io", "atatus.com",
-        // Social trackers
         "pixel.facebook.com", "www.facebook.com/tr",
         "analytics.twitter.com", "static.ads-twitter.com",
         "platform.linkedin.com", "snap.licdn.com",
         "sc-static.net", "tr.snapchat.com",
         "analytics.tiktok.com",
         "widgets.pinterest.com", "ct.pinterest.com",
-        // OEM / Misc
         "metric.gstatic.com", "beacons.gcp.gvt2.com",
-        "adsymptotic.com", "plausible.io",
-        "comscore.com"
+        "adsymptotic.com", "plausible.io", "comscore.com"
     ];
 
     // ================================================================
-    // 2. PATH THREATS (block on ANY domain including self)
+    // 2. PATH THREATS
     // ================================================================
     var PATH_THREATS = [
         "/pagead.js", "/pagead/", "/pagead2.",
@@ -114,13 +103,12 @@
     ];
 
     // ================================================================
-    // 3. BANNER KEYWORDS (from V9 — aggressive filename matching)
+    // 3. BANNER KEYWORDS
     // ================================================================
     var BANNER_KEYWORDS = [
         "advmaker", "468x60", "728x90", "300x250", "160x600",
         "970x250", "320x50", "336x280", "300x600", "970x90", "320x100",
         "ad_banner", "ad-banner", "ad_image", "banner_ad", "banner-ad",
-        // V9 additions
         "/ads/", "/ad/", "/banner/", "/banners/", "advert", "sponsor",
         "_ad.", "-ad.", "_ads.", "-ads.", "_banner.", "-banner.",
         "advertisement", "adsense", "adserver", "adtech", "adx.",
@@ -165,10 +153,7 @@
         if (!url || typeof url !== 'string') return false;
         if (url.indexOf("data:") === 0 || url.indexOf("blob:") === 0 || url.indexOf("javascript:") === 0) return false;
         if (isWhitelisted(url)) return false;
-
         var u = url.toLowerCase();
-
-        // On YouTube, only block external ad domains
         if (isYT) {
             if (u.indexOf("youtube.com") !== -1 || u.indexOf("googlevideo.com") !== -1 ||
                 u.indexOf("ytimg.com") !== -1 || u.indexOf("ggpht.com") !== -1 ||
@@ -176,7 +161,6 @@
                 return false;
             }
         }
-
         for (var i = 0; i < DOMAIN_THREATS.length; i++) {
             if (u.indexOf(DOMAIN_THREATS[i]) !== -1) return true;
         }
@@ -199,53 +183,89 @@
         return isBlocked(url) || isBannerUrl(url);
     }
 
-    // EL ENTERRADOR MEJORADO (Soluciona los recuadros blancos)
     function buryElement(el) {
         if (!el || !el.style) return;
+        try {
+            el.style.setProperty('display', 'none', 'important');
+            el.style.setProperty('visibility', 'hidden', 'important');
+            el.style.setProperty('width', '0', 'important');
+            el.style.setProperty('height', '0', 'important');
+            el.style.setProperty('min-height', '0', 'important');
+            el.style.setProperty('max-height', '0', 'important');
+            el.style.setProperty('overflow', 'hidden', 'important');
 
-        // 1. Matar el elemento
-        el.style.setProperty('display', 'none', 'important');
-        el.style.setProperty('visibility', 'hidden', 'important');
-        el.style.setProperty('width', '0', 'important');
-        el.style.setProperty('height', '0', 'important');
-
-        // 2. BUSCAR Y MATAR AL PADRE (Si es una caja de anuncio)
-        // Esto es lo que faltaba para pasar el test de "Visibility"
-        if (el.parentElement) {
-            var parent = el.parentElement;
-            // Si el padre es un DIV genérico y tiene tamaño de banner o pocas cosas dentro
-            if (parent.tagName === 'DIV') {
-                var w = parent.offsetWidth;
-                var h = parent.offsetHeight;
-                // Tamaños estándar IAB (300x250, 728x90, 468x60, etc.)
-                var isBannerSize = (w === 300 && h === 250) || (w === 728 && h === 90) ||
-                    (w === 468 && h === 60) || (w === 160 && h === 600);
-
-                // Si tiene tamaño de banner O solo contiene el elemento bloqueado
-                if (isBannerSize || parent.children.length <= 1) {
-                    parent.style.setProperty('display', 'none', 'important');
-                    parent.style.setProperty('width', '0', 'important');
-                    parent.style.setProperty('height', '0', 'important');
+            if (el.parentElement) {
+                var parent = el.parentElement;
+                if (parent.tagName === 'DIV') {
+                    var w = parent.offsetWidth, h = parent.offsetHeight;
+                    var isBannerSize = (w === 300 && h === 250) || (w === 728 && h === 90) ||
+                        (w === 468 && h === 60) || (w === 160 && h === 600);
+                    if (isBannerSize || parent.children.length <= 1) {
+                        parent.style.setProperty('display', 'none', 'important');
+                        parent.style.setProperty('width', '0', 'important');
+                        parent.style.setProperty('height', '0', 'important');
+                    }
                 }
             }
-        }
+        } catch (e) { }
     }
 
     // ================================================================
-    // 6. NETWORK INTERCEPTORS (from V25 — connections must FAIL)
+    // 6. NETWORK INTERCEPTORS
     // ================================================================
+    // --- YouTube Ad Data Stripper ---
+    // Only strip ad keys at ROOT level of the player response
+    // These are the top-level keys YouTube uses for ad config
+    var YT_AD_ROOT_KEYS = [
+        'playerAds', 'adPlacements', 'adSlots', 'adBreakParams',
+        'adBreakHeartbeatParams'
+    ];
 
-    // Fetch — reject
+    function stripYTAds(json) {
+        if (!json || typeof json !== 'object') return json;
+        // Remove root-level ad keys
+        for (var i = 0; i < YT_AD_ROOT_KEYS.length; i++) {
+            if (json[YT_AD_ROOT_KEYS[i]]) delete json[YT_AD_ROOT_KEYS[i]];
+        }
+        // Clean adSlots from playbackTracking if present
+        if (json.playbackTracking) {
+            delete json.playbackTracking.ptrackingUrl;
+        }
+        return json;
+    }
+
     var originalFetch = window.fetch;
     window.fetch = function () {
         try {
             var url = typeof arguments[0] === 'string' ? arguments[0] : (arguments[0] && arguments[0].url ? arguments[0].url : '');
             if (isBlocked(url)) return Promise.reject(new TypeError('NetworkError'));
+
+            // Intercept YouTube player API to strip ad data from response
+            if (isYT && url && (
+                url.indexOf('/youtubei/v1/player') !== -1 ||
+                url.indexOf('/youtubei/v1/next') !== -1
+            )) {
+                return originalFetch.apply(this, arguments).then(function (response) {
+                    if (!response.ok) return response;
+                    return response.clone().text().then(function (text) {
+                        try {
+                            var json = JSON.parse(text);
+                            stripYTAds(json);
+                            return new Response(JSON.stringify(json), {
+                                status: response.status,
+                                statusText: response.statusText,
+                                headers: response.headers
+                            });
+                        } catch (e) {
+                            return response;
+                        }
+                    });
+                });
+            }
         } catch (e) { }
         return originalFetch.apply(this, arguments);
     };
 
-    // XHR — error event
     var origXHROpen = XMLHttpRequest.prototype.open;
     var origXHRSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.open = function (method, url) {
@@ -257,17 +277,13 @@
         if (this._atomBlocked) {
             var self = this;
             setTimeout(function () {
-                try {
-                    self.dispatchEvent(new ProgressEvent('error'));
-                    if (typeof self.onerror === 'function') self.onerror(new ProgressEvent('error'));
-                } catch (e) { }
+                try { self.dispatchEvent(new ProgressEvent('error')); if (typeof self.onerror === 'function') self.onerror(new ProgressEvent('error')); } catch (e) { }
             }, 0);
             return;
         }
         return origXHRSend.apply(this, arguments);
     };
 
-    // sendBeacon — return false
     if (navigator.sendBeacon) {
         var origBeacon = navigator.sendBeacon.bind(navigator);
         navigator.sendBeacon = function (url) {
@@ -276,7 +292,6 @@
         };
     }
 
-    // Image src trap
     try {
         var imgDesc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
         if (imgDesc && imgDesc.configurable && imgDesc.set) {
@@ -296,7 +311,6 @@
         }
     } catch (e) { }
 
-    // Script src trap
     try {
         var scriptDesc = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
         if (scriptDesc && scriptDesc.configurable && scriptDesc.set) {
@@ -315,7 +329,6 @@
         }
     } catch (e) { }
 
-    // Iframe src trap (not on YouTube)
     if (!isYT) {
         try {
             var iframeDesc = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'src');
@@ -332,7 +345,6 @@
         } catch (e) { }
     }
 
-    // appendChild / insertBefore interception
     var origAppendChild = Node.prototype.appendChild;
     Node.prototype.appendChild = function (child) {
         if (child && child.tagName === 'SCRIPT') {
@@ -371,7 +383,6 @@
         return origInsertBefore.call(this, child, ref);
     };
 
-    // Anti-popups
     var origWindowOpen = window.open;
     window.open = function (url) {
         if (!url || isBlocked(url)) return null;
@@ -379,7 +390,7 @@
     };
 
     // ================================================================
-    // 7. COSMETIC SELECTORS + CSS
+    // 7. COSMETIC SELECTORS
     // ================================================================
     var AD_SELECTORS = [
         '.ad-unit', '.ad-zone', '.ad-area', '.ad-wrap', '.ad-wrapper',
@@ -407,66 +418,77 @@
     ];
 
     var YT_AD_SELECTORS = [
-        '.video-ads', '.ytp-ad-module', 'ytd-ad-slot-renderer',
-        'ytd-rich-item-renderer[is-ad]', '.ytp-ad-overlay-container',
-        '.ytp-ad-text-overlay', '.ytp-ad-player-overlay',
-        'ytd-banner-promo-renderer', '#masthead-ad',
-        'ytd-in-feed-ad-layout-renderer', 'ytd-promoted-sparkles-web-renderer',
-        'ytd-display-ad-renderer', '.ytd-mealbar-promo-renderer'
+        // Video ads
+        '.video-ads', '.ytp-ad-module',
+        '.ytp-ad-overlay-container', '.ytp-ad-text-overlay',
+        '.ytp-ad-player-overlay', '.ytp-ad-image-overlay',
+        // Feed ads
+        'ytd-ad-slot-renderer',
+        'ytd-rich-item-renderer[is-ad]',
+        'ytd-in-feed-ad-layout-renderer',
+        'ytd-promoted-sparkles-web-renderer',
+        'ytd-promoted-video-renderer',
+        // Sidebar / companion ads (EL ANUNCIO LATERAL)
+        'ytd-display-ad-renderer',
+        'ytd-companion-slot-renderer',
+        '#player-ads',
+        '#panels > ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"]',
+        'ytd-action-companion-ad-renderer',
+        '#companion',
+        '#above-the-fold #panels ytd-ads-engagement-panel-content-renderer',
+        // Banner / promo
+        'ytd-banner-promo-renderer',
+        'ytd-statement-banner-renderer',
+        '#masthead-ad',
+        '.ytd-mealbar-promo-renderer',
+        'ytd-popup-container ytd-mealbar-promo-renderer',
+        // Merch / shelf ads
+        'ytd-merch-shelf-renderer',
+        'ytd-brand-video-singleton-renderer',
+        'ytd-brand-video-shelf-renderer'
     ];
 
     var allSelectors = AD_SELECTORS.concat(YT_AD_SELECTORS);
     var selectorStr = allSelectors.join(',');
 
     // ================================================================
-    // 2. CSS NUCLEAR (AQUÍ ESTÁ LA SOLUCIÓN VISUAL)
+    // 8. CSS — SIN opacity:0 en video (eso causaba la pantalla negra)
     // ================================================================
-    var css = `
-        /* --- YOUTUBE ANTI-PANTALLA NEGRA --- */
-        /* Si hay anuncio, el video se vuelve invisible instantáneamente */
-        .ad-showing video { opacity: 0 !important; filter: brightness(0) !important; }
-        .ad-showing .html5-video-container { opacity: 0 !important; }
-        .ad-showing .ytp-ad-module { display: none !important; }
-        
-        /* --- YOUTUBE FEED CLEANER (Mata a Oliver Martin y Cía) --- */
-        /* Oculta cualquier caja de video que contenga texto de anuncio o badges */
-        ytd-rich-item-renderer:has(#ad-badge-container),
-        ytd-rich-item-renderer:has(.ytd-ad-slot-renderer),
-        ytd-rich-item-renderer:has(.badge-style-type-ad),
-        ytd-compact-video-renderer:has(#ad-badge-container),
-        ytd-ad-slot-renderer,
-        ytd-banner-promo-renderer,
-        ytd-promoted-sparkles-web-renderer,
-        #masthead-ad {
-            display: none !important; 
-            width: 0 !important; 
-            height: 0 !important;
-            min-height: 0 !important;
-        }
-
-        /* --- LIMPIEZA DE HUECOS (Block Visibility) --- */
-        /* Si un div contiene un objeto flash o iframe bloqueado, se oculta el padre */
-        div:has(> object), div:has(> embed), div:has(> iframe[src*="ads"]) {
-            display: none !important; width: 0 !important; height: 0 !important;
-        }
-        
-        /* --- GENÉRICOS --- */
-        .ad-unit, .ad-zone, .banner-ads, #ads, .advertisement, 
-        iframe[src*="googleads"], iframe[src*="doubleclick"]
-        { display: none !important; width: 0 !important; height: 0 !important; }
-    `;
+    var css =
+        // YouTube ads layout — ocultar contenedores sin tocar el video
+        'ytd-ad-slot-renderer,ytd-display-ad-renderer,ytd-companion-slot-renderer,' +
+        '#player-ads,ytd-action-companion-ad-renderer,' +
+        'ytd-rich-item-renderer[is-ad],ytd-in-feed-ad-layout-renderer,' +
+        'ytd-promoted-sparkles-web-renderer,ytd-promoted-video-renderer,' +
+        'ytd-banner-promo-renderer,ytd-statement-banner-renderer,' +
+        '#masthead-ad,.ytd-mealbar-promo-renderer,' +
+        'ytd-merch-shelf-renderer,ytd-brand-video-singleton-renderer,' +
+        'ytd-brand-video-shelf-renderer,' +
+        // Video overlay ads
+        '.ytp-ad-overlay-container,.ytp-ad-text-overlay,.ytp-ad-image-overlay,' +
+        // General ad selectors
+        selectorStr +
+        '{display:none!important;visibility:hidden!important;width:0!important;height:0!important;min-height:0!important;max-height:0!important;overflow:hidden!important;pointer-events:none!important;}' +
+        // Flash / objects
+        'object[data*="banner"],object[type*="shockwave-flash"],embed[src*="banner"],embed[type*="shockwave-flash"]{display:none!important;width:0!important;height:0!important;}' +
+        // Banner images
+        'img[src*="advmaker"],img[src*="/banners/"],img[src*="/ads/"],img[src*="468x60"],img[src*="728x90"],img[src*="300x250"],img[src*="pixel"],img[src*="beacon"],img[width="1"][height="1"]{display:none!important;width:0!important;height:0!important;}' +
+        // Parent containers of flash
+        'div:has(> object),div:has(> embed),div:has(> iframe[src*="ads"]){display:none!important;width:0!important;height:0!important;}';
 
     function injectCSS() {
-        var s = document.createElement('style');
-        s.id = 'atom-shield-css';
-        s.textContent = css;
-        (document.head || document.documentElement).appendChild(s);
+        try {
+            var s = document.createElement('style');
+            s.id = 'atom-shield-css';
+            s.textContent = css;
+            (document.head || document.documentElement).appendChild(s);
+        } catch (e) { }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectCSS);
     else injectCSS();
 
     // ================================================================
-    // 8. MUTATION OBSERVER
+    // 9. MUTATION OBSERVER
     // ================================================================
     var obs = new MutationObserver(function (muts) {
         for (var m = 0; m < muts.length; m++) {
@@ -478,35 +500,26 @@
                     var tag = node.tagName;
                     var src = node.src || node.data || node.getAttribute('src') || node.getAttribute('data') || '';
 
-                    // Script
                     if (tag === 'SCRIPT' && src && isBlocked(src)) {
                         node.type = 'text/blocked'; node.removeAttribute('src'); node.textContent = '';
                         continue;
                     }
-                    // Image
                     if (tag === 'IMG' && src && isAdResource(src)) {
                         node.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-                        buryElement(node);
-                        continue;
+                        buryElement(node); continue;
                     }
-                    // Iframe
                     if (tag === 'IFRAME' && src && isBlocked(src)) {
-                        node.src = 'about:blank'; buryElement(node);
-                        continue;
+                        node.src = 'about:blank'; buryElement(node); continue;
                     }
-                    // Object/Embed
                     if ((tag === 'OBJECT' || tag === 'EMBED') && isAdResource(src)) {
                         if (node.data) node.data = '';
-                        buryElement(node);
-                        continue;
+                        buryElement(node); continue;
                     }
-                    // Link
                     if (tag === 'LINK') {
                         var href = node.href || '';
                         if (href && isBlocked(href)) { node.remove(); continue; }
                     }
 
-                    // Cosmetic match
                     if (node.matches && node.matches(selectorStr)) buryElement(node);
                     if (node.querySelectorAll) {
                         var found = node.querySelectorAll(selectorStr);
@@ -520,7 +533,6 @@
     function startObs() {
         if (!document.body) return;
         obs.observe(document.body, { childList: true, subtree: true });
-        // Initial cleanup
         try { document.querySelectorAll(selectorStr).forEach(buryElement); } catch (e) { }
         try {
             document.querySelectorAll('img').forEach(function (img) {
@@ -533,42 +545,36 @@
             });
         } catch (e) { }
     }
-    // Start ASAP — observe documentElement first, then body
     try { obs.observe(document.documentElement || document, { childList: true, subtree: true }); } catch (e) { }
     if (document.body) startObs();
     else document.addEventListener('DOMContentLoaded', startObs);
 
     // ================================================================
-    // 9. THE EXECUTOR (periodic cleanup)
+    // 10. PERIODIC CLEANUP
     // ================================================================
     setInterval(function () {
         try {
-            // A. Cosmetic cleanup
             document.querySelectorAll(selectorStr).forEach(buryElement);
 
-            // B. Ad images
             document.querySelectorAll('img').forEach(function (img) {
                 if (img.src && isAdResource(img.src) && img.offsetParent !== null) buryElement(img);
             });
 
-            // C. FLASH KILLER (from V9) — hide objects/embeds and walk up parent chain
+            // Flash killer
             document.querySelectorAll('object, embed').forEach(function (el) {
                 var s = el.data || el.src || el.getAttribute('data') || el.getAttribute('src') || '';
                 var t = el.type || el.getAttribute('type') || '';
                 if (isAdResource(s) || t.indexOf('shockwave-flash') !== -1) {
                     buryElement(el);
-                    // Walk up parents (V9 logic)
                     var parent = el.parentElement;
                     while (parent && parent !== document.body) {
-                        if (parent.tagName === 'DIV' && parent.children.length <= 2) {
-                            buryElement(parent);
-                        }
+                        if (parent.tagName === 'DIV' && parent.children.length <= 2) buryElement(parent);
                         parent = parent.parentElement;
                     }
                 }
             });
 
-            // D. IAB SIZE HUNTER (from V9 — improved, not on YouTube)
+            // IAB sizes (not on YT)
             if (!isYT) {
                 var iabSizes = [
                     [728, 90], [300, 250], [160, 600], [468, 60], [970, 250],
@@ -580,7 +586,6 @@
                     var w = el.offsetWidth, h = el.offsetHeight;
                     for (var s = 0; s < iabSizes.length; s++) {
                         if (Math.abs(w - iabSizes[s][0]) < 5 && Math.abs(h - iabSizes[s][1]) < 5) {
-                            // V9: more aggressive — hide if iframe, empty, or contains ad elements
                             if (el.tagName === 'IFRAME' || el.tagName === 'INS' ||
                                 el.tagName === 'OBJECT' || el.tagName === 'EMBED' ||
                                 el.children.length === 0 ||
@@ -602,7 +607,7 @@
                 });
             }
 
-            // E. Ad text cleanup (from V9)
+            // Ad text cleanup
             document.querySelectorAll('div, span').forEach(function (el) {
                 if (el.offsetParent !== null && (el.innerText || '').length < 30) {
                     var text = (el.innerText || '').toLowerCase().trim();
@@ -617,74 +622,135 @@
     }, isYT ? 100 : 200);
 
     // ================================================================
-    // 10. YOUTUBE AD ROBOT (V18 PHANTOM MODE)
+    // 11. YOUTUBE AD ROBOT — NUCLEAR PRE-ROLL KILLER
     // ================================================================
     if (isYT) {
-        // Usamos un observer específico para la clase 'ad-showing' del reproductor
-        // Esto es mucho más rápido que un setInterval
+
+        // --- A. ULTRA-FAST SKIP (50ms) — empieza ANTES que el player exista ---
+        // Este intervalo es el primero que ataca. No espera al MutationObserver.
+        var _ytAdKiller = setInterval(function () {
+            try {
+                var v = document.querySelector('video');
+                if (!v) return;
+
+                var p = document.querySelector('#movie_player');
+                var isAd = p && p.classList.contains('ad-showing');
+
+                // Detectar ad también por la presencia de elementos ad
+                if (!isAd) {
+                    isAd = !!document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .ad-interrupting');
+                }
+
+                if (isAd) {
+                    // Saltar al final instantáneamente
+                    if (v.duration && isFinite(v.duration) && v.currentTime < v.duration - 0.5) {
+                        v.currentTime = v.duration;
+                    }
+
+                    // Click TODOS los botones de skip
+                    document.querySelectorAll(
+                        '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, ' +
+                        '.ytp-ad-skip-button-slot, .ytp-ad-skip-button-container button, ' +
+                        '[class*="skip"] button, .ytp-ad-overlay-close-button'
+                    ).forEach(function (b) { try { b.click(); } catch (e) { } });
+                } else {
+                    // No ad playing, nothing to do
+                }
+            } catch (e) { }
+        }, 50);
+
+        // --- B. MutationObserver en el player (respaldo preciso) ---
         function initYTSkip() {
             var player = document.querySelector('#movie_player');
             if (player) {
-                new MutationObserver(function (mutations) {
-                    if (player.classList.contains('ad-showing')) {
-                        // El CSS ya oculta el video (opacity: 0). Nosotros hacemos la lógica:
-                        var v = document.querySelector('video');
-                        if (v) {
-                            v.muted = true;
-                            // Salto al final - 0.1s
-                            if (!isNaN(v.duration)) v.currentTime = v.duration;
-                            v.playbackRate = 16.0;
-                        }
-                        // Clickar botones
-                        var btns = document.querySelectorAll('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button');
-                        btns.forEach(b => b.click());
+                new MutationObserver(function () {
+                    if (!player.classList.contains('ad-showing')) return;
+                    var v = document.querySelector('video');
+                    if (v && !isNaN(v.duration) && isFinite(v.duration)) {
+                        v.currentTime = v.duration;
                     }
+                    document.querySelectorAll(
+                        '.ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button,.ytp-ad-skip-button-slot'
+                    ).forEach(function (b) { try { b.click(); } catch (e) { } });
+                    document.querySelectorAll('.ytp-ad-overlay-close-button')
+                        .forEach(function (b) { try { b.click(); } catch (e) { } });
                 }).observe(player, { attributes: true, attributeFilter: ['class'] });
             } else {
-                setTimeout(initYTSkip, 500); // Reintentar si no cargó aún
+                setTimeout(initYTSkip, 300);
             }
         }
         initYTSkip();
-        // Intervalo de respaldo para el Feed (scroll infinito)
+
+        // --- C. VIDEO ELEMENT OBSERVER — detecta el momento en que cambia el src ---
+        // Cuando YouTube carga un anuncio, el elemento <video> cambia de src.
+        // Lo interceptamos y saltamos al final inmediatamente.
+        function watchVideoElement() {
+            var v = document.querySelector('video');
+            if (v) {
+                new MutationObserver(function () {
+                    var p = document.querySelector('#movie_player');
+                    if (p && p.classList.contains('ad-showing')) {
+                        if (v.duration && isFinite(v.duration)) {
+                            v.currentTime = v.duration;
+                        }
+                    }
+                }).observe(v, { attributes: true, attributeFilter: ['src'] });
+
+                // También escuchar eventos de carga de video
+                v.addEventListener('loadedmetadata', function () {
+                    var p = document.querySelector('#movie_player');
+                    if (p && p.classList.contains('ad-showing')) {
+                        if (v.duration && isFinite(v.duration)) {
+                            v.currentTime = v.duration;
+                        }
+                    }
+                });
+                v.addEventListener('playing', function () {
+                    var p = document.querySelector('#movie_player');
+                    if (p && p.classList.contains('ad-showing')) {
+                        if (v.duration && isFinite(v.duration)) {
+                            v.currentTime = v.duration;
+                        }
+                    }
+                });
+            } else {
+                setTimeout(watchVideoElement, 200);
+            }
+        }
+        watchVideoElement();
+
+        // --- D. Limpieza del feed + sidebar (cada 500ms, no necesita ser rápido) ---
         setInterval(function () {
             try {
-                // Skip buttons (Fallback)
-                document.querySelectorAll('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button').forEach(function (b) { b.click(); });
-
-                // Fast-forward ad video (Fallback)
-                var p = document.querySelector('#movie_player');
-                if (p && p.classList.contains('ad-showing')) {
-                    var v = document.querySelector('video');
-                    if (v && v.duration && isFinite(v.duration)) v.currentTime = v.duration;
-                    document.querySelectorAll('.ytp-ad-overlay-close-button').forEach(function (b) { b.click(); });
-                }
-
-                // Clean YT sponsored items
-                document.querySelectorAll('ytd-rich-item-renderer, ytd-video-renderer').forEach(function (el) {
-                    var txt = (el.innerText || "").toUpperCase();
-                    if (txt.includes("PATROCINADO") || txt.includes("SPONSORED") || txt.includes("PUBLICIDAD")) {
+                // Sponsored items en feed
+                document.querySelectorAll('ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer').forEach(function (el) {
+                    var txt = (el.innerText || '').toUpperCase();
+                    if (txt.includes('PATROCINADO') || txt.includes('SPONSORED') || txt.includes('PUBLICIDAD')) {
                         buryElement(el);
                     }
                 });
 
-                // Cerrar popups de "Hazte Premium"
-                var dialogs = document.querySelectorAll('ytd-popup-container, ytd-mealbar-promo-renderer');
-                dialogs.forEach(function (d) { d.style.display = 'none'; });
+                // Popups premium
+                document.querySelectorAll('ytd-popup-container ytd-mealbar-promo-renderer')
+                    .forEach(function (d) { buryElement(d); });
+
+                // Sidebar ads
+                document.querySelectorAll(
+                    'ytd-display-ad-renderer, ytd-companion-slot-renderer, ' +
+                    '#player-ads, ytd-action-companion-ad-renderer, ' +
+                    'ytd-merch-shelf-renderer, ytd-brand-video-singleton-renderer'
+                ).forEach(function (el) { buryElement(el); });
             } catch (e) { }
         }, 500);
     }
 
     // ================================================================
-    // 11. GLOBAL MOCKS (V25 base + V9 extended)
+    // 12. GLOBAL MOCKS
     // ================================================================
     try {
         var noop = function () { };
 
-        // --- Google Analytics ---
-        window.ga = Object.assign(noop, {
-            create: noop, getByName: noop, getAll: function () { return []; },
-            remove: noop, loaded: true, q: [], l: Date.now()
-        });
+        window.ga = Object.assign(noop, { create: noop, getByName: noop, getAll: function () { return []; }, remove: noop, loaded: true, q: [], l: Date.now() });
         window.gtag = function () { };
         window.google_tag_manager = {};
         window.dataLayer = []; window.dataLayer.push = noop;
@@ -692,12 +758,10 @@
         window.__gtagTracker = noop;
         window.google_tag_data = {};
 
-        // --- Facebook Pixel ---
         window.fbq = Object.assign(noop, { callMethod: noop, queue: [], push: noop, loaded: true, version: '2.0' });
         window._fbq = window.fbq;
         window.fbAsyncInit = noop;
 
-        // --- Sentry ---
         window.Sentry = {
             init: noop, captureException: noop, captureMessage: noop, captureEvent: noop,
             configureScope: noop,
@@ -711,130 +775,59 @@
         };
         window.__SENTRY__ = { hub: undefined, logger: noop, extensions: {} };
 
-        // --- Bugsnag ---
         window.Bugsnag = {
             start: function () { return window.Bugsnag; }, notify: noop, leaveBreadcrumb: noop,
             setUser: noop, addMetadata: noop, addOnError: noop,
             getPlugin: function () { return null; }, getUser: function () { return {}; },
-            isStarted: function () { return true; },
-            _client: { _config: {}, _session: null }
+            isStarted: function () { return true; }, _client: { _config: {}, _session: null }
         };
         window.bugsnagClient = window.Bugsnag;
         window.bugsnag = function () { return window.Bugsnag; };
 
-        // --- Hotjar ---
         window.hj = Object.assign(function () { }, { q: [], identify: noop });
         window._hjSettings = { hjid: 0, hjsv: 6 };
 
-        // --- Yandex Metrika ---
         window.ym = function () { };
         window.Ya = {
             Metrika2: function () { return { reachGoal: noop, hit: noop, params: noop }; },
             Metrika: function () { return { reachGoal: noop, hit: noop, params: noop }; }
         };
 
-        // --- Mixpanel ---
-        window.mixpanel = {
-            init: noop, track: noop, identify: noop, alias: noop, set_config: noop,
-            get_distinct_id: function () { return ''; },
-            people: { set: noop, append: noop, union: noop, increment: noop },
-            register: noop, register_once: noop, reset: noop, get_property: noop, push: noop
-        };
-
-        // --- Segment ---
-        window.analytics = {
-            identify: noop, track: noop, page: noop, group: noop, alias: noop,
-            ready: noop, reset: noop, on: noop, once: noop, off: noop, push: noop, load: noop
-        };
-
-        // --- Microsoft Clarity ---
+        window.mixpanel = { init: noop, track: noop, identify: noop, alias: noop, set_config: noop, get_distinct_id: function () { return ''; }, people: { set: noop, append: noop, union: noop, increment: noop }, register: noop, register_once: noop, reset: noop, get_property: noop, push: noop };
+        window.analytics = { identify: noop, track: noop, page: noop, group: noop, alias: noop, ready: noop, reset: noop, on: noop, once: noop, off: noop, push: noop, load: noop };
         window.clarity = noop;
-
-        // --- Chartbeat ---
         window.pSUPERFLY = { init: noop, virtualPage: noop, activity: noop };
         window._sf_async_config = {};
-
-        // --- New Relic ---
         window.newrelic = { setPageViewName: noop, setCustomAttribute: noop, addPageAction: noop, noticeError: noop, finished: noop, addRelease: noop };
         window.NREUM = { init: {}, loader_config: {}, info: {} };
-
-        // --- Rollbar ---
         window.Rollbar = { init: noop, critical: noop, error: noop, warning: noop, info: noop, debug: noop, log: noop, configure: noop };
-
-        // --- LogRocket ---
         window.LogRocket = { init: noop, identify: noop, track: noop, getSessionURL: noop, captureException: noop };
-
-        // --- TrackJS ---
         window.trackJs = { configure: noop, track: noop, attempt: function (fn) { return fn(); } };
         window.TrackJS = window.trackJs;
-
-        // --- Heap ---
         window.heap = { track: noop, identify: noop, resetIdentity: noop, load: noop, addUserProperties: noop, addEventProperties: noop, loaded: true, appid: '' };
-
-        // --- Amplitude ---
-        window.amplitude = {
-            init: noop, logEvent: noop, setUserId: noop, setUserProperties: noop,
-            getInstance: function () { return window.amplitude; }
-        };
-
-        // --- FullStory ---
+        window.amplitude = { init: noop, logEvent: noop, setUserId: noop, setUserProperties: noop, getInstance: function () { return window.amplitude; } };
         window.FS = { identify: noop, setUserVars: noop, event: noop, log: noop, shutdown: noop, getCurrentSessionURL: function () { return ''; } };
-
-        // --- Optimizely ---
         window.optimizely = { push: noop };
-
-        // --- CrazyEgg ---
         window.CE2 = {};
-
-        // ====== V9 EXTENDED MOCKS ======
-
-        // Twitter Pixel
         window.twq = noop;
-
-        // Pinterest
         window.pintrk = noop;
-
-        // LinkedIn
         window._linkedin_data_partner_ids = [];
         window.lintrk = noop;
-
-        // Comscore
         window.COMSCORE = { beacon: noop };
         window._comscore = [];
-
-        // Quantcast
         window.__qc = {};
         window._qevents = [];
-
-        // Intercom
         window.Intercom = noop;
         window.intercomSettings = {};
-
-        // Drift
         window.drift = { SNIPPET_VERSION: '0.3.1', load: noop, identify: noop, track: noop, api: {}, on: noop, off: noop, reset: noop };
-
-        // Crisp
         window.$crisp = [];
         window.CRISP_WEBSITE_ID = '';
-
-        // Olark
         window.olark = noop;
-
-        // Mouseflow
         window._mfq = [];
-
-        // Lucky Orange
         window.__lo_site_id = 0;
-
-        // Adroll
         window.adroll = {};
         window.__adroll_loaded = true;
-
-        // TCF / Consent
         window.__tcfapi = noop;
-
-        // Misc
         window._hmt = [];
-
     } catch (e) { }
 })();

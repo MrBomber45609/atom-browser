@@ -14,20 +14,8 @@
         "title": "Atom Browser",
         "width": 1200,
         "height": 800,
-        "decorations": true,
-        "transparent": false
-      },
-      {
-        "label": "popup",
-        "title": "Popup",
-        "url": "popup.html",
-        "width": 380,
-        "height": 500,
         "decorations": false,
-        "transparent": true,
-        "visible": false,
-        "alwaysOnTop": false,
-        "skipTaskbar": true
+        "transparent": false
       }
     ],
     "security": {

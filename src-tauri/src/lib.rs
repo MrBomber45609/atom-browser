@@ -6,7 +6,7 @@ use tauri::{Emitter, Manager, WebviewUrl};
 // --- CONSTANTES ---
 const BARRA_ALTURA: f64 = 72.0;
 
-// --- SCRIPT DE SEGURIDAD (cargado desde archivo externo) ---
+// --- SCRIPT DE SEGURIDAD ---
 const ATOM_SHIELD_SCRIPT: &str = include_str!("../scripts/atom_shield.js");
 
 // --- ESTADO ---
@@ -64,7 +64,6 @@ async fn create_tab(
     let handle = app.clone();
     let tab_id_clone = tab_id.clone();
 
-    // Preservar lógica original de home.html
     let stored_url = url.clone().unwrap_or_else(|| "atom://home".to_string());
 
     let webview_url = match url {
@@ -80,36 +79,33 @@ async fn create_tab(
     win.add_child(
         tauri::webview::WebviewBuilder::new(&tab_id, webview_url)
             .auto_resize()
-            .on_download(move |webview, event| {
-                match event {
-                    tauri::webview::DownloadEvent::Requested { url, destination } => {
-                        let filename = destination
-                            .file_name()
-                            .map(|f| f.to_string_lossy().to_string())
-                            .unwrap_or_default();
-                        // Broadcast globally so Popup and Main window both get it
-                        let _ = webview.app_handle().emit(
-                            "download-started",
-                            serde_json::json!({
-                                "id": url.to_string(),
-                                "filename": filename,
-                                "path": destination.to_string_lossy()
-                            }),
-                        );
-                        true
-                    }
-                    tauri::webview::DownloadEvent::Finished { url, success, .. } => {
-                        let _ = webview.app_handle().emit(
-                            "download-finished",
-                            serde_json::json!({
-                                "id": url.to_string(),
-                                "success": success
-                            }),
-                        );
-                        true
-                    }
-                    _ => true,
+            .on_download(move |webview, event| match event {
+                tauri::webview::DownloadEvent::Requested { url, destination } => {
+                    let filename = destination
+                        .file_name()
+                        .map(|f| f.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let _ = webview.app_handle().emit(
+                        "download-started",
+                        serde_json::json!({
+                            "id": url.to_string(),
+                            "filename": filename,
+                            "path": destination.to_string_lossy()
+                        }),
+                    );
+                    true
                 }
+                tauri::webview::DownloadEvent::Finished { url, success, .. } => {
+                    let _ = webview.app_handle().emit(
+                        "download-finished",
+                        serde_json::json!({
+                            "id": url.to_string(),
+                            "success": success
+                        }),
+                    );
+                    true
+                }
+                _ => true,
             })
             .on_page_load(move |webview, _payload| {
                 let _ = webview.eval(ATOM_SHIELD_SCRIPT);
@@ -240,60 +236,36 @@ fn get_active_tab(state: tauri::State<TabState>) -> Option<String> {
     manager.active_tab.clone()
 }
 
-// --- PUNTO DE ENTRADA ---
+// --- CONTROLES DE VENTANA (BACKEND) ---
 
 #[tauri::command]
-fn toggle_popup(app: tauri::AppHandle, show: bool) {
-    if let Some(window) = app.get_webview_window("popup") {
-        if show {
-            // Hardcoded position/size specific to "Download" button for now,
-            // or we could pass x,y relative to monitor.
-            // For simplicity in V1, let's just show it. Ideally frontend passes logic.
-            // But main window is decoration-less, so (0,0) is screen (0,0) IF maximized?
-            // Actually, we'll let frontend calculate position if possible,
-            // but for "Z-Order fix", just showing it on top is the key.
-            // Let's rely on standard positioning if provided, or default.
-            // Wait, command signature in plan was (show, x, y, width, height).
-            // Let's stick to simple "show/hide" first, and let the window keep its defined size.
-            // Positioning relative to parent is tricky without client logic.
-            // REVISION: Let's accept position args.
-            window.show().unwrap();
-            window.set_focus().unwrap();
-        } else {
-            window.hide().unwrap();
-        }
+fn close_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_window("main") {
+        let _ = window.close();
     }
 }
 
 #[tauri::command]
-fn content_position(app: tauri::AppHandle, x: f64, y: f64) {
-    // x, y ahora son relativos al viewport de la ventana 'main'
-    if let Some(popup) = app.get_webview_window("popup") {
-        if let Some(main) = app.get_webview_window("main") {
-            if let Ok(main_pos) = main.inner_position() {
-                // Usamos inner_position para obtener la esquina superior izquierda del área de contenido (ignorando barra título)
-                // Nota: PhysicalPosition -> LogicalPosition conversion might be needed implicity or explicitly?
-                // inner_position devuelve PhysicalPosition (pixeles reales).
-                // set_position espera Position enum.
+fn minimize_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_window("main") {
+        let _ = window.minimize();
+    }
+}
 
-                // Como las coords de JS (getBoundingClientRect) vienen en pixels lógicos (CSS pixels),
-                // y inner_position está en físicos, necesitamos el scale factor.
-                let scale_factor = main.scale_factor().unwrap_or(1.0);
-
-                let main_logical_x = main_pos.x as f64 / scale_factor;
-                let main_logical_y = main_pos.y as f64 / scale_factor;
-
-                let final_x = main_logical_x + x;
-                let final_y = main_logical_y + y;
-
-                let _ = popup.set_position(tauri::Position::Logical(tauri::LogicalPosition {
-                    x: final_x,
-                    y: final_y,
-                }));
+#[tauri::command]
+fn maximize_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_window("main") {
+        if let Ok(is_maximized) = window.is_maximized() {
+            if is_maximized {
+                let _ = window.unmaximize();
+            } else {
+                let _ = window.maximize();
             }
         }
     }
 }
+
+// --- PUNTO DE ENTRADA ---
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -310,35 +282,33 @@ pub fn run() {
             close_tab,
             switch_tab,
             get_active_tab,
-            toggle_popup,
-            content_position
+            close_window,
+            minimize_window,
+            maximize_window
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Resized(size) = event {
                 if window.label() == "main" {
                     let tab_state: TabState = window.state::<TabState>().inner().clone();
-
-                    {
-                        let manager = tab_state.lock().unwrap();
-                        for (id, _) in manager.tabs.iter() {
-                            if let Some(webview) = window.get_webview(id) {
-                                let width = size.width as f64;
-                                let height = size.height as f64;
-                                let _ = webview.set_bounds(tauri::Rect {
-                                    position: tauri::Position::Logical(tauri::LogicalPosition {
-                                        x: 0.0,
-                                        y: BARRA_ALTURA,
-                                    }),
-                                    size: tauri::Size::Logical(tauri::LogicalSize {
-                                        width,
-                                        height: if height > BARRA_ALTURA {
-                                            height - BARRA_ALTURA
-                                        } else {
-                                            0.0
-                                        },
-                                    }),
-                                });
-                            }
+                    let manager = tab_state.lock().unwrap();
+                    for (id, _) in manager.tabs.iter() {
+                        if let Some(webview) = window.get_webview(id) {
+                            let width = size.width as f64;
+                            let height = size.height as f64;
+                            let _ = webview.set_bounds(tauri::Rect {
+                                position: tauri::Position::Logical(tauri::LogicalPosition {
+                                    x: 0.0,
+                                    y: BARRA_ALTURA,
+                                }),
+                                size: tauri::Size::Logical(tauri::LogicalSize {
+                                    width,
+                                    height: if height > BARRA_ALTURA {
+                                        height - BARRA_ALTURA
+                                    } else {
+                                        0.0
+                                    },
+                                }),
+                            });
                         }
                     }
                 }

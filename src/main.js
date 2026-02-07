@@ -1,6 +1,9 @@
 // Tauri APIs
-const { invoke } = window.__TAURI__.core;
-const { listen } = window.__TAURI__.event;
+// Tauri APIs - Wrapper setup
+const { invoke } = window.__TAURI__.core || { invoke: async () => console.warn('Tauri invoke not available') };
+const { listen } = window.__TAURI__.event || { listen: () => console.warn('Tauri listen not available') };
+const { getCurrentWindow } = window.__TAURI__.window || { getCurrentWindow: () => null };
+
 
 // --- ELEMENTOS DEL DOM ---
 const urlInput = document.getElementById("url-bar");
@@ -11,13 +14,12 @@ const btnRefresh = document.getElementById("btn-refresh");
 const btnNewTab = document.getElementById("btn-new-tab");
 const btnAdblock = document.getElementById("btn-adblock");
 const btnBookmark = document.getElementById("btn-bookmark");
-const btnDownloads = document.getElementById("btn-downloads"); // [NEW]
+const btnDownloads = document.getElementById("btn-downloads");
 const btnMenu = document.getElementById("btn-menu");
 const tabsContainer = document.getElementById("tabs-container");
 const progressBar = document.getElementById("progress-bar");
-const favicon = document.getElementById("favicon");
 
-// Menú desplegable
+// Menú
 const dropdownMenu = document.getElementById("dropdown-menu");
 const menuHistory = document.getElementById("menu-history");
 const menuSearchEngine = document.getElementById("menu-search-engine");
@@ -31,17 +33,42 @@ const btnClearHistory = document.getElementById("btn-clear-history");
 const bookmarksOverlay = document.getElementById("bookmarks-overlay");
 const bookmarksList = document.getElementById("bookmarks-list");
 const btnCloseBookmarks = document.getElementById("btn-close-bookmarks");
-
-// Downloads Overlay
 const downloadsOverlay = document.getElementById("downloads-overlay");
 const downloadsList = document.getElementById("downloads-list");
 const btnCloseDownloads = document.getElementById("btn-close-downloads");
 const btnClearDownloads = document.getElementById("btn-clear-downloads");
 
-// Search Engine Overlay
+// Search Engine
 const searchEngineOverlay = document.getElementById("search-engine-overlay");
 const btnCloseSearchEngine = document.getElementById("btn-close-search-engine");
 const searchEngineItems = document.querySelectorAll(".search-engine-item");
+
+// Window Controls
+const btnMinimize = document.getElementById("btn-minimize");
+const btnMaximize = document.getElementById("btn-maximize");
+const btnCloseWindow = document.getElementById("btn-close-window");
+
+// --- CONTROLES DE VENTANA ---
+// --- CONTROLES DE VENTANA ---
+// Usamos comandos directos al backend para asegurar funcionalidad
+if (btnMinimize) {
+  btnMinimize.addEventListener("click", () => {
+    invoke("minimize_window").catch(e => console.error("Error minimizing:", e));
+  });
+}
+
+if (btnMaximize) {
+  btnMaximize.addEventListener("click", () => {
+    invoke("maximize_window").catch(e => console.error("Error maximizing:", e));
+  });
+}
+
+if (btnCloseWindow) {
+  btnCloseWindow.addEventListener("click", () => {
+    invoke("close_window").catch(e => console.error("Error closing:", e));
+  });
+}
+
 
 // --- MOTORES DE BÚSQUEDA ---
 const SEARCH_ENGINES = {
@@ -56,26 +83,43 @@ let currentSearchEngine = localStorage.getItem("atom-search-engine") || "duckduc
 // --- ESTADO ---
 const tabs = new Map();
 let activeTabId = null;
-const isPrivateMode = false; // Siempre modo privado (no guarda historial en modo privado, pero aquí lo dejamos apagado)
-const isAdblockEnabled = true; // Siempre activo
+const isPrivateMode = false;
+const isAdblockEnabled = true;
+
+// --- UTILIDADES ---
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
+// --- FAVICON PRIVADO (sin Google) ---
+function getFaviconUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    // Usar directamente el favicon del sitio — sin filtrar por Google
+    return urlObj.origin + '/favicon.ico';
+  } catch {
+    return '';
+  }
+}
 
 // --- FUNCIONES AUXILIARES ---
-
 function createTabElement(tabId, isActive = false) {
   const tabEl = document.createElement("div");
   tabEl.className = "tab animate-enter" + (isActive ? " active" : "");
   tabEl.dataset.tabId = tabId;
   tabEl.title = "Nueva pestaña";
   tabEl.innerHTML = `
-    <img class="tab-favicon" src="" alt="" />
+    <img class="tab-favicon" src="" alt="" onerror="this.src='ico.png'" />
     <span class="tab-title">Nueva pestaña</span>
     <button class="tab-close" title="Cerrar">×</button>
   `;
 
   tabEl.addEventListener("click", (e) => {
-    if (!e.target.classList.contains("tab-close")) {
-      switchTab(tabId);
-    }
+    if (!e.target.classList.contains("tab-close")) switchTab(tabId);
   });
 
   tabEl.querySelector(".tab-close").addEventListener("click", (e) => {
@@ -87,18 +131,12 @@ function createTabElement(tabId, isActive = false) {
 }
 
 // --- FUNCIONES DE TABS ---
-
 async function createTab(url = null) {
   try {
-    console.log("Solicitando nueva pestaña...");
     const tabId = await invoke("create_tab", { url });
-    console.log("Nueva pestaña creada:", tabId);
-
     tabs.set(tabId, { url: url || "about:blank", title: "Nueva pestaña" });
     const tabEl = createTabElement(tabId, true);
-
     document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-    // Insertar antes del botón de nueva pestaña
     tabsContainer.insertBefore(tabEl, btnNewTab);
     activeTabId = tabId;
     urlInput.value = "";
@@ -112,7 +150,6 @@ async function closeTab(tabId) {
   try {
     await invoke("close_tab", { tabId });
     tabs.delete(tabId);
-
     const tabEl = document.querySelector(`[data-tab-id="${tabId}"]`);
     if (tabEl) tabEl.remove();
 
@@ -131,11 +168,9 @@ async function switchTab(tabId) {
   try {
     await invoke("switch_tab", { tabId });
     activeTabId = tabId;
-
     document.querySelectorAll(".tab").forEach((t) => {
       t.classList.toggle("active", t.dataset.tabId === tabId);
     });
-
     const tabInfo = tabs.get(tabId);
     if (tabInfo) {
       showDomainOnly(tabInfo.url);
@@ -155,7 +190,6 @@ function updateTabInfo(tabId, url) {
 
   const tabEl = document.querySelector(`[data-tab-id="${tabId}"]`);
   if (tabEl) {
-    // Manejar página de inicio
     if (url === 'atom://home' || url.includes('home.html')) {
       tabEl.querySelector(".tab-title").textContent = "Nueva pestaña";
       tabEl.querySelector(".tab-favicon").src = "ico.png";
@@ -165,7 +199,8 @@ function updateTabInfo(tabId, url) {
         const urlObj = new URL(url);
         const domain = urlObj.hostname.replace("www.", "");
         tabEl.querySelector(".tab-title").textContent = domain || "Nueva pestaña";
-        tabEl.querySelector(".tab-favicon").src = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
+        // Favicon privado — directo del dominio
+        tabEl.querySelector(".tab-favicon").src = getFaviconUrl(url);
         tabEl.title = url;
       } catch {
         tabEl.querySelector(".tab-title").textContent = "Nueva pestaña";
@@ -173,19 +208,15 @@ function updateTabInfo(tabId, url) {
     }
   }
 
-  if (tabId === activeTabId) {
-    showDomainOnly(url);
-  }
+  if (tabId === activeTabId) showDomainOnly(url);
 }
 
 // --- NAVEGACIÓN ---
-
 function handleNavigation() {
   const input = urlInput.value.trim();
   if (!input) return;
 
   let finalUrl;
-
   if (input.includes(".") && !input.includes(" ")) {
     finalUrl = input.startsWith("http") ? input : "https://" + input;
   } else {
@@ -199,24 +230,6 @@ function handleNavigation() {
 }
 
 // --- HISTORIAL ---
-
-// --- UTILIDADES ---
-// Función Debounce para optimizar escritura en disco
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
-
-// --- HISTORIAL OPTIMIZADO ---
-
-// Guardamos en memoria inmediatamente, pero en disco cada 2 segundos máximo
 const saveToHistoryDisk = debounce((history) => {
   localStorage.setItem("atom-history", JSON.stringify(history.slice(0, 100)));
 }, 2000);
@@ -224,46 +237,32 @@ const saveToHistoryDisk = debounce((history) => {
 function saveToHistory(url) {
   if (isPrivateMode) return;
   if (!url || url === "about:blank" || url.startsWith("atom://")) return;
-
-  // Leemos, actualizamos memoria
   const history = JSON.parse(localStorage.getItem("atom-history") || "[]");
-
-  // Evitar duplicados consecutivos
   if (history[0]?.url === url) return;
-
   history.unshift({ url, time: Date.now() });
-
-  // Disparamos el guardado optimizado
   saveToHistoryDisk(history);
 }
 
 // --- LOADING ---
-
-// --- LOADING MEJORADO ---
 let loadingTimeout;
 
 function startLoading() {
   clearTimeout(loadingTimeout);
   progressBar.classList.remove("complete");
   progressBar.style.width = "0%";
-  // Forzar reflow para reiniciar animación
   void progressBar.offsetWidth;
   progressBar.classList.add("loading");
   btnRefresh.classList.add("loading");
-
-  // Fallback: Si por alguna razón no recibimos evento de carga terminada, parar a los 10s
   loadingTimeout = setTimeout(stopLoading, 10000);
 }
 
 function stopLoading() {
   clearTimeout(loadingTimeout);
   progressBar.classList.remove("loading");
-  progressBar.style.width = "100%"; // Llenar visualmente
-
+  progressBar.style.width = "100%";
   setTimeout(() => {
-    progressBar.classList.add("complete"); // Desvanecer
+    progressBar.classList.add("complete");
     btnRefresh.classList.remove("loading");
-    // Resetear después de la animación de desvanecimiento
     setTimeout(() => {
       progressBar.style.width = "0%";
       progressBar.classList.remove("complete");
@@ -271,29 +270,22 @@ function stopLoading() {
   }, 200);
 }
 
-// --- ESCUCHAR CAMBIOS DE URL ---
+// --- URL CHANGED ---
 listen('url-changed', (event) => {
   const { id, url } = event.payload;
-  console.log("URL cambiada en tab:", id, url);
-
   stopLoading();
   updateTabInfo(id, url);
   saveToHistory(url);
-
-  if (id === activeTabId) {
-    updateBookmarkStar();
-  }
+  if (id === activeTabId) updateBookmarkStar();
 });
 
-// --- URL BAR ESTILO HELIUM (mostrar solo dominio) ---
+// --- URL BAR ---
 function showDomainOnly(url) {
-  // Manejar página de inicio
   if (url === 'atom://home' || url.includes('home.html')) {
     urlInput.value = '';
     urlInput.dataset.fullUrl = '';
     return;
   }
-
   try {
     const urlObj = new URL(url);
     urlInput.value = urlObj.hostname.replace('www.', '');
@@ -317,33 +309,17 @@ urlInput.addEventListener('blur', () => {
   }
 });
 
-// --- EVENTOS ---
-
-urlInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    handleNavigation();
-  }
-});
-
+// --- EVENTOS DE NAVEGACIÓN ---
+urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") handleNavigation(); });
 btnGo.addEventListener("click", handleNavigation);
 btnBack.addEventListener("click", () => invoke("go_back"));
 btnForward.addEventListener("click", () => invoke("go_forward"));
-btnRefresh.addEventListener("click", () => {
-  startLoading();
-  invoke("reload");
-});
+btnRefresh.addEventListener("click", () => { startLoading(); invoke("reload"); });
 btnNewTab.addEventListener("click", () => createTab());
 
-// --- MENÚ DESPLEGABLE ---
-btnMenu.addEventListener("click", (e) => {
-  e.stopPropagation();
-  dropdownMenu.classList.toggle("hidden");
-});
-
-// Cerrar menú al hacer clic fuera
-document.addEventListener("click", () => {
-  dropdownMenu.classList.add("hidden");
-});
+// --- MENÚ ---
+btnMenu.addEventListener("click", (e) => { e.stopPropagation(); dropdownMenu.classList.toggle("hidden"); });
+document.addEventListener("click", () => dropdownMenu.classList.add("hidden"));
 
 menuHistory.addEventListener("click", () => {
   dropdownMenu.classList.add("hidden");
@@ -379,79 +355,45 @@ searchEngineItems.forEach(item => {
   });
 });
 
-btnCloseSearchEngine.addEventListener("click", () => {
-  searchEngineOverlay.classList.add("hidden");
-});
+btnCloseSearchEngine.addEventListener("click", () => searchEngineOverlay.classList.add("hidden"));
 
 // --- ATAJOS DE TECLADO ---
 document.addEventListener("keydown", (e) => {
-  // Ctrl+L: Focus en URL bar
-  if (e.ctrlKey && e.key === "l") {
-    e.preventDefault();
-    urlInput.focus();
-    urlInput.select();
-  }
+  if (e.ctrlKey && e.key === "l") { e.preventDefault(); urlInput.focus(); urlInput.select(); }
+  if ((e.ctrlKey && e.key === "r") || e.key === "F5") { e.preventDefault(); startLoading(); invoke("reload"); }
+  if (e.altKey && e.key === "ArrowLeft") { e.preventDefault(); invoke("go_back"); }
+  if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); invoke("go_forward"); }
+  if (e.ctrlKey && e.key === "t") { e.preventDefault(); createTab(); }
+  if (e.ctrlKey && e.key === "w") { e.preventDefault(); if (activeTabId) closeTab(activeTabId); }
 
-  // Ctrl+R o F5: Recargar
-  if ((e.ctrlKey && e.key === "r") || e.key === "F5") {
-    e.preventDefault();
-    startLoading();
-    invoke("reload");
-  }
-
-  // Alt+Left: Atrás
-  if (e.altKey && e.key === "ArrowLeft") {
-    e.preventDefault();
-    invoke("go_back");
-  }
-
-  // Alt+Right: Adelante
-  if (e.altKey && e.key === "ArrowRight") {
-    e.preventDefault();
-    invoke("go_forward");
-  }
-
-  // Ctrl+T: Nueva pestaña
-  if (e.ctrlKey && e.key === "t") {
-    e.preventDefault();
-    createTab();
-  }
-
-  // Ctrl+W: Cerrar pestaña
-  if (e.ctrlKey && e.key === "w") {
-    e.preventDefault();
-    if (activeTabId) {
-      closeTab(activeTabId);
-    }
-  }
-
-  // Ctrl+Tab: Siguiente pestaña
-  if (e.ctrlKey && e.key === "Tab") {
+  if (e.ctrlKey && !e.shiftKey && e.key === "Tab") {
     e.preventDefault();
     const tabIds = Array.from(tabs.keys());
-    const currentIndex = tabIds.indexOf(activeTabId);
-    const nextIndex = (currentIndex + 1) % tabIds.length;
-    switchTab(tabIds[nextIndex]);
+    const idx = tabIds.indexOf(activeTabId);
+    switchTab(tabIds[(idx + 1) % tabIds.length]);
   }
-
-  // Ctrl+Shift+Tab: Pestaña anterior
   if (e.ctrlKey && e.shiftKey && e.key === "Tab") {
     e.preventDefault();
     const tabIds = Array.from(tabs.keys());
-    const currentIndex = tabIds.indexOf(activeTabId);
-    const prevIndex = (currentIndex - 1 + tabIds.length) % tabIds.length;
-    switchTab(tabIds[prevIndex]);
+    const idx = tabIds.indexOf(activeTabId);
+    switchTab(tabIds[(idx - 1 + tabIds.length) % tabIds.length]);
   }
+
+  if (e.key === "Escape") {
+    historyOverlay.classList.add("hidden");
+    bookmarksOverlay.classList.add("hidden");
+    searchEngineOverlay.classList.add("hidden");
+    downloadsOverlay.classList.add("hidden");
+    dropdownMenu.classList.add("hidden");
+  }
+  if (e.ctrlKey && e.key === "h") { e.preventDefault(); renderHistory(); historyOverlay.classList.toggle("hidden"); }
+  if (e.ctrlKey && e.key === "d") { e.preventDefault(); toggleBookmark(); }
+  if (e.ctrlKey && e.key === "j") { e.preventDefault(); renderDownloads(); downloadsOverlay.classList.toggle("hidden"); }
 });
 
 // --- MARCADORES ---
-function getBookmarks() {
-  return JSON.parse(localStorage.getItem("atom-bookmarks") || "[]");
-}
-
-function isBookmarked(url) {
-  return getBookmarks().some(b => b.url === url);
-}
+function getBookmarks() { return JSON.parse(localStorage.getItem("atom-bookmarks") || "[]"); }
+function isBookmarked(url) { return getBookmarks().some(b => b.url === url); }
 
 function toggleBookmark() {
   const url = tabs.get(activeTabId)?.url;
@@ -469,7 +411,6 @@ function toggleBookmark() {
     btnBookmark.classList.add("bookmarked");
     btnBookmark.textContent = "★";
   }
-
   localStorage.setItem("atom-bookmarks", JSON.stringify(bookmarks.slice(0, 100)));
 }
 
@@ -510,12 +451,9 @@ function renderBookmarks() {
   });
 }
 
-// --- HISTORIAL OVERLAY ---
-// --- RENDERIZADO EFICIENTE ---
+// --- HISTORIAL ---
 function renderHistory() {
   const history = JSON.parse(localStorage.getItem("atom-history") || "[]");
-
-  // Usamos DocumentFragment para una sola reflow del DOM (Más rápido)
   const fragment = document.createDocumentFragment();
 
   if (history.length === 0) {
@@ -523,16 +461,12 @@ function renderHistory() {
     return;
   }
 
-  // Limitamos renderizado visual a 50 items para mantener la UI fluida
   history.slice(0, 50).forEach(h => {
     const item = document.createElement("div");
     item.className = "history-item";
     const date = new Date(h.time);
     const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-    // Sanitización básica de URL para evitar XSS visual
     const safeUrl = h.url.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
     item.innerHTML = `
       <span class="url">${safeUrl}</span>
       <span class="time">${timeStr}</span>
@@ -548,62 +482,19 @@ function renderHistory() {
   historyList.appendChild(fragment);
 }
 
-// --- EVENTOS DE OVERLAYS ---
 btnBookmark.addEventListener("click", toggleBookmark);
-
 btnCloseHistory.addEventListener("click", () => historyOverlay.classList.add("hidden"));
-
-btnClearHistory.addEventListener("click", () => {
-  localStorage.removeItem("atom-history");
-  renderHistory();
-});
-
-// Bookmarks overlay (right click on star)
-btnBookmark.addEventListener("contextmenu", (e) => {
-  e.preventDefault();
-  renderBookmarks();
-  bookmarksOverlay.classList.remove("hidden");
-});
-
+btnClearHistory.addEventListener("click", () => { localStorage.removeItem("atom-history"); renderHistory(); });
+btnBookmark.addEventListener("contextmenu", (e) => { e.preventDefault(); renderBookmarks(); bookmarksOverlay.classList.remove("hidden"); });
 btnCloseBookmarks.addEventListener("click", () => bookmarksOverlay.classList.add("hidden"));
 
-// Cerrar overlays con Escape
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    historyOverlay.classList.add("hidden");
-    bookmarksOverlay.classList.add("hidden");
-    searchEngineOverlay.classList.add("hidden");
-    dropdownMenu.classList.add("hidden");
-  }
-  // Ctrl+H para historial
-  if (e.ctrlKey && e.key === "h") {
-    e.preventDefault();
-    renderHistory();
-    historyOverlay.classList.toggle("hidden");
-  }
-  // Ctrl+D para marcador
-  if (e.ctrlKey && e.key === "d") {
-    e.preventDefault();
-    toggleBookmark();
-  }
-  // Ctrl+J para descargas
-  if (e.ctrlKey && e.key === "j") {
-    e.preventDefault();
-    renderDownloads();
-    downloadsOverlay.classList.toggle("hidden");
-  }
-});
+// ================================================================
+// GESTOR DE DESCARGAS (integrado como overlay)
+// ================================================================
+const downloads = new Map();
 
-// --- GESTOR DE DESCARGAS ---
-const downloads = new Map(); // id -> { filename, path, total, current, state: 'progress'|'finished'|'error' }
-
-function getDownloadsHistory() {
-  return JSON.parse(localStorage.getItem("atom-downloads") || "[]");
-}
-
-function saveDownloadsHistory(list) {
-  localStorage.setItem("atom-downloads", JSON.stringify(list.slice(0, 50)));
-}
+function getDownloadsHistory() { return JSON.parse(localStorage.getItem("atom-downloads") || "[]"); }
+function saveDownloadsHistory(list) { localStorage.setItem("atom-downloads", JSON.stringify(list.slice(0, 50))); }
 
 function updateDownloadBtn() {
   const history = getDownloadsHistory();
@@ -612,53 +503,111 @@ function updateDownloadBtn() {
   } else {
     btnDownloads.classList.add("hidden");
   }
-
-  // Animation if any active download
   const hasActive = Array.from(downloads.values()).some(d => d.state === 'progress');
-  if (hasActive) {
-    btnDownloads.classList.add("downloading");
-  } else {
-    btnDownloads.classList.remove("downloading");
-  }
+  btnDownloads.classList.toggle("downloading", hasActive);
 }
 
-// Send data to Popup Window
-async function syncPopupData() {
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function renderDownloads() {
   const history = getDownloadsHistory();
   const active = Array.from(downloads.values()).reverse();
-  const all = [...active, ...history].slice(0, 50);
+  const all = [...active, ...history];
 
-  // Emit event globally so Popup picks it up
-  await window.__TAURI__.event.emit("render-downloads", { downloads: all });
+  if (all.length === 0) {
+    downloadsList.innerHTML = '<div class="empty-state">No hay descargas</div>';
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+
+  all.slice(0, 30).forEach(d => {
+    const item = document.createElement("div");
+    let stateClass = '';
+    let statusText = '';
+    let progressWidth = '0%';
+    let progressClass = 'download-progress-fill';
+
+    if (d.state === 'progress') {
+      stateClass = 'active';
+      if (d.total > 0) {
+        const percent = Math.round((d.current / d.total) * 100);
+        statusText = `${percent}% — ${formatBytes(d.current)} / ${formatBytes(d.total)}`;
+        progressWidth = `${percent}%`;
+      } else {
+        statusText = 'Descargando...';
+        progressWidth = '100%';
+        progressClass += ' indeterminate';
+      }
+    } else if (d.state === 'finished') {
+      stateClass = 'completed';
+      statusText = 'Completado';
+      progressWidth = '100%';
+      progressClass += ' complete';
+    } else {
+      stateClass = 'error';
+      statusText = 'Error';
+      progressWidth = '100%';
+      progressClass += ' error';
+    }
+
+    item.className = `download-item ${stateClass}`;
+
+    const iconSvg = d.state === 'finished'
+      ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>'
+      : d.state === 'error'
+        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+
+    const safeName = (d.filename || 'Descarga').replace(/</g, '&lt;');
+
+    item.innerHTML = `
+      <div class="download-icon">${iconSvg}</div>
+      <div class="download-info">
+        <div class="download-name" title="${safeName}">${safeName}</div>
+        <div class="download-meta">${statusText}</div>
+      </div>
+      <div class="download-progress">
+        <div class="${progressClass}" style="width: ${progressWidth}"></div>
+      </div>
+    `;
+
+    fragment.appendChild(item);
+  });
+
+  downloadsList.innerHTML = "";
+  downloadsList.appendChild(fragment);
 }
 
-// Event Listeners for Downloads
-btnDownloads.addEventListener("click", async () => {
-  // Obtener rectángulo del botón relativo al viewport
-  const rect = btnDownloads.getBoundingClientRect();
-
-  // Coordenadas relativas a la esquina superior izquierda del área de contenido (viewport)
-  // Queremos alinear el borde derecho del popup con el borde derecho del botón:
-  const popupWidth = 380; // Debe coincidir con CSS/Tauri config
-  const relativeX = rect.right - popupWidth;
-  const relativeY = rect.bottom + 5; // Un pequeño margen vertical
-
-  // Send data first
-  await syncPopupData();
-
-  // Move (sending relative coords) and Show
-  await invoke("content_position", { x: relativeX, y: relativeY });
-  await invoke("toggle_popup", { show: true });
+// Botón descargas — abre overlay
+btnDownloads.addEventListener("click", () => {
+  renderDownloads();
+  downloadsOverlay.classList.remove("hidden");
 });
 
-// We don't need local overlay logic anymore for downloads
-// btnCloseDownloads... etc removal or ignore
-// We still listen to events to update Badge/Button state
+btnCloseDownloads.addEventListener("click", () => downloadsOverlay.classList.add("hidden"));
+
+btnClearDownloads.addEventListener("click", () => {
+  localStorage.removeItem("atom-downloads");
+  downloads.clear();
+  updateDownloadBtn();
+  renderDownloads();
+});
+
+// --- EVENTOS DE DESCARGAS ---
 listen('download-started', (event) => {
   const { id, filename, path } = event.payload;
   downloads.set(id, { id, filename, path, current: 0, total: 0, state: 'progress' });
   updateDownloadBtn();
-  syncPopupData();
+  // Auto-mostrar overlay cuando empieza descarga
+  renderDownloads();
+  downloadsOverlay.classList.remove("hidden");
 });
 
 listen('download-progress', (event) => {
@@ -667,7 +616,8 @@ listen('download-progress', (event) => {
   if (d) {
     d.current = current;
     d.total = total;
-    syncPopupData(); // Realtime update popup
+    // Actualizar UI en tiempo real si overlay está visible
+    if (!downloadsOverlay.classList.contains("hidden")) renderDownloads();
   }
 });
 
@@ -679,36 +629,28 @@ listen('download-finished', (event) => {
     const history = getDownloadsHistory();
     const existingIdx = history.findIndex(x => x.id === id);
     if (existingIdx >= 0) history.splice(existingIdx, 1);
-
     history.unshift(d);
     saveDownloadsHistory(history);
     downloads.delete(id);
     updateDownloadBtn();
-    syncPopupData();
+    if (!downloadsOverlay.classList.contains("hidden")) renderDownloads();
   }
 });
 
-// Inicializar botón
 updateDownloadBtn();
 
 // --- INICIALIZACIÓN ---
 async function init() {
   try {
     let tabId = await invoke("get_active_tab");
-    console.log("Tab inicial:", tabId);
-
     if (!tabId) {
-      await createTab(); // Crea pestaña por defecto (home)
+      await createTab();
       return;
     }
-
-    if (tabId) {
-      tabs.set(tabId, { url: "about:blank", title: "Nueva pestaña" });
-      activeTabId = tabId;
-      const tabEl = createTabElement(tabId, true);
-      // Insertar antes del botón de nueva pestaña
-      tabsContainer.insertBefore(tabEl, btnNewTab);
-    }
+    tabs.set(tabId, { url: "about:blank", title: "Nueva pestaña" });
+    activeTabId = tabId;
+    const tabEl = createTabElement(tabId, true);
+    tabsContainer.insertBefore(tabEl, btnNewTab);
   } catch (error) {
     console.error("Error inicializando:", error);
   }

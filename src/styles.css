@@ -1,5 +1,4 @@
 :root {
-  /* Colores refinados - Paleta minimalista */
   --bg-primary: #0a0a0b;
   --bg-secondary: #151517;
   --bg-tertiary: #1a1a1d;
@@ -8,50 +7,43 @@
   --bg-input-hover: rgba(255, 255, 255, 0.06);
   --bg-input-focus: rgba(255, 255, 255, 0.08);
 
-  /* Colores de acento */
   --accent-primary: #6b9eff;
   --accent-secondary: #8b7fff;
   --accent-success: #7fd97f;
   --accent-warning: #ffc159;
   --accent-danger: #ff6b6b;
 
-  /* Texto */
   --text-primary: #e8e8e9;
   --text-secondary: #a8a8aa;
   --text-tertiary: #6b6b6d;
   --text-muted: #4a4a4c;
 
-  /* Bordes */
   --border-subtle: rgba(255, 255, 255, 0.06);
   --border-medium: rgba(255, 255, 255, 0.1);
   --border-strong: rgba(255, 255, 255, 0.15);
 
-  /* Sombras */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
   --shadow-glow: 0 0 20px rgba(107, 158, 255, 0.15);
 
-  /* Espaciado consistente */
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 12px;
   --space-lg: 16px;
   --space-xl: 24px;
 
-  /* Radios de borde */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
 
-  /* Transiciones */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ===== RESET Y BASE ===== */
+/* ===== RESET ===== */
 * {
   margin: 0;
   padding: 0;
@@ -69,26 +61,23 @@ body {
   color: var(--text-primary);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ===== BARRA DE TÍTULO (Pestañas) ===== */
+/* ===== BARRA DE TÍTULO ===== */
 #title-bar {
   background: var(--bg-primary);
   display: flex;
   align-items: center;
-  /* Eliminamos padding vertical variable, usamos height fijo */
   padding: 0 var(--space-sm);
   gap: var(--space-sm);
   height: 32px;
-  /* Altura Fija */
   width: 100%;
   border-bottom: 1px solid var(--border-subtle);
   z-index: 100;
   flex-shrink: 0;
-  /* Aseguramos que nada se salga del flujo */
   box-sizing: border-box;
   overflow: hidden;
+  -webkit-app-region: drag;
 }
 
 #browser-icon {
@@ -99,6 +88,48 @@ body {
   flex-shrink: 0;
   object-fit: contain;
   opacity: 0.9;
+}
+
+/* ===== CONTROLES DE VENTANA ===== */
+#window-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: auto;
+  height: 100%;
+}
+
+.window-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  width: 36px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  -webkit-app-region: no-drag;
+}
+
+.window-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.window-btn:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.window-btn-close:hover {
+  background: var(--accent-danger);
+  color: white;
+}
+
+.window-btn-close:active {
+  background: #e05555;
 }
 
 /* ===== CONTENEDOR DE PESTAÑAS ===== */
@@ -117,7 +148,7 @@ body {
   display: none;
 }
 
-/* ===== PESTAÑA INDIVIDUAL ===== */
+/* ===== PESTAÑA ===== */
 .tab {
   display: flex;
   align-items: center;
@@ -257,18 +288,16 @@ body {
   transform: scale(0.95);
 }
 
-/* ===== BARRA DE CONTROL (Navegación + URL) ===== */
+/* ===== BARRA DE CONTROL ===== */
 #control-bar {
   background: var(--bg-elevated);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   display: flex;
   align-items: center;
-  /* Eliminamos padding vertical variable */
   padding: 0 var(--space-md);
   gap: var(--space-xs);
   height: 40px;
-  /* Altura Fija */
   border-bottom: 1px solid var(--border-subtle);
   z-index: 90;
   flex-shrink: 0;
@@ -321,7 +350,6 @@ body {
   pointer-events: none;
 }
 
-/* ===== BOTÓN AD-BLOCKER ===== */
 #btn-adblock.active {
   color: var(--accent-success);
   background: rgba(127, 217, 127, 0.1);
@@ -332,29 +360,29 @@ body {
   opacity: 0;
 }
 
-/* ===== BOTÓN MARCADOR ===== */
 #btn-bookmark.bookmarked {
   color: var(--accent-warning);
   text-shadow: 0 0 8px rgba(255, 193, 89, 0.3);
 }
 
-/* ===== BOTÓN DESCARGAS ===== */
 #btn-downloads {
   color: var(--text-secondary);
 }
 
 #btn-downloads:hover {
   color: var(--text-primary);
-  background: var(--bg-input);
 }
 
 #btn-downloads.downloading {
   color: var(--accent-primary);
 }
 
-/* Pequeña animación de rebote sutil */
 #btn-downloads.downloading svg {
   animation: download-bounce 2s infinite;
+}
+
+#btn-downloads.hidden {
+  display: none !important;
 }
 
 @keyframes download-bounce {
@@ -376,10 +404,6 @@ body {
   }
 }
 
-#btn-downloads.hidden {
-  display: none !important;
-}
-
 /* ===== BARRA DE URL ===== */
 #url-bar {
   flex: 1;
@@ -392,9 +416,8 @@ body {
   font-size: 13px;
   font-weight: 400;
   outline: none;
-  transition: background var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base), color var(--transition-base);
+  transition: background var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
   min-width: 50px;
-  /* max-width removed for consistency */
 }
 
 #url-bar:hover {
@@ -457,7 +480,6 @@ body {
   transition: width 0.2s, opacity 0.4s ease-out;
 }
 
-/* ===== ANIMACIÓN DE CARGA ===== */
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -519,7 +541,7 @@ body {
   margin: var(--space-xs) 0;
 }
 
-/* ===== OVERLAYS (Generales) ===== */
+/* ===== OVERLAYS ===== */
 .overlay {
   position: fixed;
   inset: 0;
@@ -607,9 +629,10 @@ body {
   color: var(--text-primary);
 }
 
-/* ===== LISTAS DE HISTORIAL Y MARCADORES ===== */
+/* ===== LISTAS (Historial, Marcadores, Descargas) ===== */
 #history-list,
-#bookmarks-list {
+#bookmarks-list,
+#downloads-list {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-sm);
@@ -618,24 +641,22 @@ body {
 }
 
 #history-list::-webkit-scrollbar,
-#bookmarks-list::-webkit-scrollbar {
+#bookmarks-list::-webkit-scrollbar,
+#downloads-list::-webkit-scrollbar {
   width: 6px;
 }
 
 #history-list::-webkit-scrollbar-track,
-#bookmarks-list::-webkit-scrollbar-track {
+#bookmarks-list::-webkit-scrollbar-track,
+#downloads-list::-webkit-scrollbar-track {
   background: transparent;
 }
 
 #history-list::-webkit-scrollbar-thumb,
-#bookmarks-list::-webkit-scrollbar-thumb {
+#bookmarks-list::-webkit-scrollbar-thumb,
+#downloads-list::-webkit-scrollbar-thumb {
   background: var(--border-medium);
   border-radius: 3px;
-}
-
-#history-list::-webkit-scrollbar-thumb:hover,
-#bookmarks-list::-webkit-scrollbar-thumb:hover {
-  background: var(--border-strong);
 }
 
 .history-item,
@@ -674,86 +695,24 @@ body {
   flex-shrink: 0;
 }
 
-/* ===== POPUP MENU (Descargas estilo Chrome) ===== */
-.popup-menu {
-  position: fixed;
-  top: 60px;
-  /* Debajo de la barra de control */
-  right: 140px;
-  /* Alineado con el botón (aprox) */
-  width: 380px;
-  background: var(--bg-elevated);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  z-index: 2001;
-  max-height: 500px;
-  opacity: 1;
-  transform-origin: top right;
-  transition: opacity 0.2s cubic-bezier(0.2, 0, 0, 1), transform 0.2s cubic-bezier(0.2, 0, 0, 1);
-}
-
-.popup-menu.hidden {
-  opacity: 0;
-  transform: scale(0.95) translateY(-10px);
-  pointer-events: none;
-}
-
-.popup-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-md) var(--space-lg);
-  border-bottom: 1px solid var(--border-subtle);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.popup-header h3 {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.popup-actions {
-  display: flex;
-  gap: var(--space-xs);
-}
-
-.popup-actions button {
-  background: transparent;
-  border: none;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
-}
-
-.popup-actions button:hover {
-  background: var(--bg-input-hover);
-  color: var(--text-primary);
-}
-
-/* ===== ITEMS DE DESCARGA (Estilo Tarjeta) ===== */
+/* ===== ITEMS DE DESCARGA ===== */
 .download-item {
   display: flex;
   align-items: center;
   gap: var(--space-md);
   padding: var(--space-md) var(--space-lg);
-  border-bottom: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   transition: background var(--transition-fast);
   position: relative;
   overflow: hidden;
+  margin-bottom: var(--space-xs);
 }
 
 .download-item:hover {
   background: var(--bg-input);
 }
 
-.download-icon-box {
+.download-icon {
   width: 32px;
   height: 32px;
   display: flex;
@@ -763,6 +722,18 @@ body {
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   flex-shrink: 0;
+}
+
+.download-item.completed .download-icon {
+  color: var(--accent-success);
+}
+
+.download-item.error .download-icon {
+  color: var(--accent-danger);
+}
+
+.download-item.active .download-icon {
+  color: var(--accent-primary);
 }
 
 .download-info {
@@ -790,36 +761,36 @@ body {
   gap: 6px;
 }
 
-.download-progress-bg {
+.download-progress {
   position: absolute;
   bottom: 0;
   left: 0;
   height: 2px;
   width: 100%;
   background: transparent;
-  pointer-events: none;
 }
 
-.download-progress-bar {
+.download-progress-fill {
   height: 100%;
   background: var(--accent-primary);
   width: 0%;
-  transition: width 0.2s linear;
+  transition: width 0.3s linear;
+  border-radius: 1px;
 }
 
-.download-progress-bar.complete {
+.download-progress-fill.complete {
   background: transparent;
 }
 
-/* Ocultar barra al terminar */
-.download-progress-bar.error {
+.download-progress-fill.error {
   background: var(--accent-danger);
 }
 
-.download-progress-bar.indeterminate {
+.download-progress-fill.indeterminate {
   background: linear-gradient(90deg, var(--accent-primary) 25%, var(--accent-secondary) 50%, var(--accent-primary) 75%);
   background-size: 200% 100%;
   animation: indeterminate 1.5s infinite linear;
+  width: 100%;
 }
 
 @keyframes indeterminate {
@@ -857,9 +828,7 @@ body {
   background: rgba(255, 107, 107, 0.15);
 }
 
-/* Remove old overlay-action styles if not used elsewhere, or keep for other overlays */
 .overlay-action {
-  /* Keep existing styles just in case settings use it */
   margin: var(--space-md) var(--space-xl) var(--space-xl);
   padding: var(--space-md);
   background: rgba(255, 107, 107, 0.12);
@@ -883,7 +852,7 @@ body {
   transform: translateY(0);
 }
 
-/* ===== SELECTOR DE MOTOR DE BÚSQUEDA ===== */
+/* ===== MOTOR DE BÚSQUEDA ===== */
 .search-engine-list {
   padding: var(--space-sm);
 }
@@ -919,18 +888,18 @@ body {
   opacity: 0.95;
 }
 
-/* ===== UTILIDADES OCULTAS ===== */
-#btn-go,
-#favicon {
-  display: none;
-}
-
-/* ===== MENSAJES VACÍOS ===== */
+/* ===== EMPTY STATE ===== */
 .empty-state {
   padding: var(--space-xl);
   text-align: center;
   color: var(--text-muted);
   font-size: 13px;
+}
+
+/* ===== OCULTOS ===== */
+#btn-go,
+#favicon {
+  display: none;
 }
 
 /* ===== RESPONSIVE ===== */
@@ -966,8 +935,7 @@ body {
 
 @media (max-width: 480px) {
   #title-bar {
-    padding: var(--space-xs) var(--space-xs);
-    min-height: 28px;
+    padding: var(--space-xs);
   }
 
   #browser-icon {
@@ -991,7 +959,7 @@ body {
     height: 12px;
   }
 
-  #control-bar {
-    min-height: 36px;
+  .window-btn {
+    width: 30px;
   }
 }
