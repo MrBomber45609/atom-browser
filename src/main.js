@@ -1,11 +1,31 @@
-// Tauri APIs
-// Tauri APIs - Wrapper setup
-const { invoke } = window.__TAURI__.core || { invoke: async () => console.warn('Tauri invoke not available') };
-const { listen } = window.__TAURI__.event || { listen: () => console.warn('Tauri listen not available') };
-const { getCurrentWindow } = window.__TAURI__.window || { getCurrentWindow: () => null };
+// ================================================================
+// CONFIGURACIÓN CORE (PUENTE ELECTRON)
+// ================================================================
 
+// Accedemos a la API expuesta en preload.js
+const electron = window.electronAPI;
 
-// --- ELEMENTOS DEL DOM ---
+// 1. Wrapper para 'invoke': Mantiene la compatibilidad con tu código actual
+const invoke = async (cmd, args) => {
+  try {
+    return await electron.invoke(cmd, args);
+  } catch (e) {
+    console.error(`Error invocando '${cmd}':`, e);
+    return null;
+  }
+};
+
+// 2. Wrapper para 'listen': Adapta los eventos de Electron al formato { payload } de Tauri
+const listen = (channel, callback) => {
+  electron.on(channel, (data) => {
+    // Envolvemos la data para que tu código existente no se rompa
+    callback({ payload: data });
+  });
+};
+
+// ================================================================
+// ELEMENTOS DEL DOM
+// ================================================================
 const urlInput = document.getElementById("url-bar");
 const btnGo = document.getElementById("btn-go");
 const btnBack = document.getElementById("btn-back");
@@ -43,31 +63,19 @@ const searchEngineOverlay = document.getElementById("search-engine-overlay");
 const btnCloseSearchEngine = document.getElementById("btn-close-search-engine");
 const searchEngineItems = document.querySelectorAll(".search-engine-item");
 
-// Window Controls
+// Controles de ventana
 const btnMinimize = document.getElementById("btn-minimize");
 const btnMaximize = document.getElementById("btn-maximize");
 const btnCloseWindow = document.getElementById("btn-close-window");
 
-// --- CONTROLES DE VENTANA ---
-// --- CONTROLES DE VENTANA ---
-// Usamos comandos directos al backend para asegurar funcionalidad
-if (btnMinimize) {
-  btnMinimize.addEventListener("click", () => {
-    invoke("minimize_window").catch(e => console.error("Error minimizing:", e));
-  });
-}
+// ================================================================
+// LÓGICA DE INTERFAZ
+// ================================================================
 
-if (btnMaximize) {
-  btnMaximize.addEventListener("click", () => {
-    invoke("maximize_window").catch(e => console.error("Error maximizing:", e));
-  });
-}
-
-if (btnCloseWindow) {
-  btnCloseWindow.addEventListener("click", () => {
-    invoke("close_window").catch(e => console.error("Error closing:", e));
-  });
-}
+// --- CONTROLES DE VENTANA (Nativo Electron) ---
+if (btnMinimize) btnMinimize.addEventListener("click", () => electron.minimize());
+if (btnMaximize) btnMaximize.addEventListener("click", () => electron.maximize());
+if (btnCloseWindow) btnCloseWindow.addEventListener("click", () => electron.close());
 
 
 // --- MOTORES DE BÚSQUEDA ---
@@ -84,7 +92,7 @@ let currentSearchEngine = localStorage.getItem("atom-search-engine") || "duckduc
 const tabs = new Map();
 let activeTabId = null;
 const isPrivateMode = false;
-const isAdblockEnabled = true;
+let isAdblockEnabled = true;
 
 // --- UTILIDADES ---
 function debounce(func, wait) {
@@ -95,25 +103,137 @@ function debounce(func, wait) {
   };
 }
 
-// --- FAVICON PRIVADO (sin Google) ---
+// --- FAVICON MEJORADO (Usa API de Google) ---
 function getFaviconUrl(url) {
   try {
+    if (!url || url.startsWith('file:') || url.startsWith('atom:')) return '';
     const urlObj = new URL(url);
-    // Usar directamente el favicon del sitio — sin filtrar por Google
-    return urlObj.origin + '/favicon.ico';
+    return `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=64`;
   } catch {
     return '';
   }
 }
 
-// --- FUNCIONES AUXILIARES ---
+// --- FUNCIONES AUXILIARES DE PESTAÑAS ---
+// --- Pointer-based tab drag system (smooth reordering) ---
+let dragState = null;
+
+function initTabDrag(tabEl, e) {
+  if (e.button !== 0) return; // solo click izquierdo
+  const startX = e.clientX;
+  const startY = e.clientY;
+  let dragging = false;
+
+  const onMove = (ev) => {
+    const dx = ev.clientX - startX;
+    const dy = ev.clientY - startY;
+    if (!dragging && Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+
+    if (!dragging) {
+      dragging = true;
+      startDrag(tabEl, ev);
+    }
+    updateDrag(ev);
+  };
+
+  const onUp = () => {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    if (dragging) endDrag();
+  };
+
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+}
+
+function startDrag(tabEl, e) {
+  // Create ghost
+  const rect = tabEl.getBoundingClientRect();
+  const ghost = tabEl.cloneNode(true);
+  ghost.className = 'tab active tab-drag-ghost';
+  ghost.style.width = rect.width + 'px';
+  ghost.style.height = rect.height + 'px';
+  ghost.style.left = rect.left + 'px';
+  ghost.style.top = rect.top + 'px';
+  document.body.appendChild(ghost);
+
+  // Create drop indicator
+  const indicator = document.createElement('div');
+  indicator.className = 'tab-drop-indicator';
+  tabsContainer.style.position = 'relative';
+  tabsContainer.appendChild(indicator);
+
+  tabEl.classList.add('dragging');
+  tabEl.setPointerCapture && tabEl.releasePointerCapture(e.pointerId);
+
+  dragState = {
+    tabEl, ghost, indicator,
+    offsetX: e.clientX - rect.left,
+    offsetY: e.clientY - rect.top,
+    containerRect: tabsContainer.getBoundingClientRect()
+  };
+}
+
+function updateDrag(e) {
+  if (!dragState) return;
+  const { ghost, indicator, offsetX, offsetY } = dragState;
+
+  // Move ghost
+  ghost.style.left = (e.clientX - offsetX) + 'px';
+  ghost.style.top = (e.clientY - offsetY) + 'px';
+
+  // Find drop position
+  const tabs = Array.from(tabsContainer.querySelectorAll('.tab:not(.dragging)'));
+  let insertBefore = null;
+  let indicatorLeft = -999;
+
+  for (const tab of tabs) {
+    const r = tab.getBoundingClientRect();
+    const mid = r.left + r.width / 2;
+    if (e.clientX < mid) {
+      insertBefore = tab;
+      indicatorLeft = r.left - dragState.containerRect.left - 1;
+      break;
+    }
+  }
+
+  if (!insertBefore) {
+    // After last tab
+    const last = tabs[tabs.length - 1];
+    if (last) {
+      const r = last.getBoundingClientRect();
+      indicatorLeft = r.right - dragState.containerRect.left + 1;
+    }
+  }
+
+  indicator.style.left = indicatorLeft + 'px';
+  dragState.insertBefore = insertBefore;
+}
+
+function endDrag() {
+  if (!dragState) return;
+  const { tabEl, ghost, indicator, insertBefore } = dragState;
+
+  // Move tab in DOM
+  if (insertBefore) {
+    tabsContainer.insertBefore(tabEl, insertBefore);
+  } else {
+    tabsContainer.insertBefore(tabEl, btnNewTab);
+  }
+
+  tabEl.classList.remove('dragging');
+  ghost.remove();
+  indicator.remove();
+  dragState = null;
+}
+
 function createTabElement(tabId, isActive = false) {
   const tabEl = document.createElement("div");
   tabEl.className = "tab animate-enter" + (isActive ? " active" : "");
   tabEl.dataset.tabId = tabId;
   tabEl.title = "Nueva pestaña";
   tabEl.innerHTML = `
-    <img class="tab-favicon" src="" alt="" onerror="this.src='ico.png'" />
+    <img class="tab-favicon" src="" alt="" onerror="this.style.display='none'" />
     <span class="tab-title">Nueva pestaña</span>
     <button class="tab-close" title="Cerrar">×</button>
   `;
@@ -127,20 +247,33 @@ function createTabElement(tabId, isActive = false) {
     closeTab(tabId);
   });
 
+  // Pointer-based drag
+  tabEl.addEventListener("pointerdown", (e) => {
+    if (e.target.classList.contains("tab-close")) return;
+    initTabDrag(tabEl, e);
+  });
+
+  // Prevent native drag
+  tabEl.addEventListener("dragstart", (e) => e.preventDefault());
+
   return tabEl;
 }
 
-// --- FUNCIONES DE TABS ---
+// --- LÓGICA PRINCIPAL DE PESTAÑAS ---
 async function createTab(url = null) {
   try {
+    // Invocamos al backend de Electron
     const tabId = await invoke("create_tab", { url });
-    tabs.set(tabId, { url: url || "about:blank", title: "Nueva pestaña" });
-    const tabEl = createTabElement(tabId, true);
-    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-    tabsContainer.insertBefore(tabEl, btnNewTab);
-    activeTabId = tabId;
-    urlInput.value = "";
-    urlInput.focus();
+
+    if (tabId) {
+      tabs.set(tabId, { url: url || "about:blank", title: "Nueva pestaña" });
+      const tabEl = createTabElement(tabId, true);
+      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+      tabsContainer.insertBefore(tabEl, btnNewTab);
+      activeTabId = tabId;
+      urlInput.value = "";
+      urlInput.focus();
+    }
   } catch (error) {
     console.error("Error creando pestaña:", error);
   }
@@ -192,15 +325,18 @@ function updateTabInfo(tabId, url) {
   if (tabEl) {
     if (url === 'atom://home' || url.includes('home.html')) {
       tabEl.querySelector(".tab-title").textContent = "Nueva pestaña";
-      tabEl.querySelector(".tab-favicon").src = "ico.png";
+      const fav = tabEl.querySelector(".tab-favicon");
+      fav.src = "";
+      fav.style.display = "none";
       tabEl.title = "Nueva pestaña";
     } else {
       try {
         const urlObj = new URL(url);
         const domain = urlObj.hostname.replace("www.", "");
         tabEl.querySelector(".tab-title").textContent = domain || "Nueva pestaña";
-        // Favicon privado — directo del dominio
-        tabEl.querySelector(".tab-favicon").src = getFaviconUrl(url);
+        const fav = tabEl.querySelector(".tab-favicon");
+        const favUrl = getFaviconUrl(url);
+        if (favUrl) { fav.src = favUrl; fav.style.display = ""; } else { fav.style.display = "none"; }
         tabEl.title = url;
       } catch {
         tabEl.querySelector(".tab-title").textContent = "Nueva pestaña";
@@ -236,7 +372,7 @@ const saveToHistoryDisk = debounce((history) => {
 
 function saveToHistory(url) {
   if (isPrivateMode) return;
-  if (!url || url === "about:blank" || url.startsWith("atom://")) return;
+  if (!url || url === "about:blank" || url.startsWith("atom://") || url.includes("home.html")) return;
   const history = JSON.parse(localStorage.getItem("atom-history") || "[]");
   if (history[0]?.url === url) return;
   history.unshift({ url, time: Date.now() });
@@ -270,7 +406,7 @@ function stopLoading() {
   }, 200);
 }
 
-// --- URL CHANGED ---
+// --- LISTENERS DEL BACKEND ---
 listen('url-changed', (event) => {
   const { id, url } = event.payload;
   stopLoading();
@@ -279,22 +415,25 @@ listen('url-changed', (event) => {
   if (id === activeTabId) updateBookmarkStar();
 });
 
-// --- FULLSCREEN IMMERSIVE (2 PASOS) ---
+// Atom Shield state sync (desde context menu del main process)
+listen('adblock-state', (event) => {
+  isAdblockEnabled = event.payload;
+  btnAdblock.classList.toggle("active", isAdblockEnabled);
+  btnAdblock.title = isAdblockEnabled ? "Atom Shield: Activo" : "Atom Shield: Desactivado";
+});
+
+// Fullscreen Immersive
 listen('fullscreen-change', (event) => {
   const isFullscreen = event.payload;
   if (isFullscreen) {
-    // Paso 1: Animar UI hacia arriba
     document.body.classList.add('fullscreen-hiding');
-    // Paso 2: Después de la animación, aplicar fullscreen completo
     setTimeout(() => {
       document.body.classList.remove('fullscreen-hiding');
       document.body.classList.add('fullscreen-mode');
     }, 280);
   } else {
-    // Paso 1: Quitar fullscreen y mostrar UI con animación
     document.body.classList.remove('fullscreen-mode');
     document.body.classList.add('fullscreen-showing');
-    // Paso 2: Limpiar clase de animación
     setTimeout(() => {
       document.body.classList.remove('fullscreen-showing');
     }, 400);
@@ -302,44 +441,187 @@ listen('fullscreen-change', (event) => {
 });
 
 // --- URL BAR ---
+// --- MOSTRAR URL COMPLETA ---
 function showDomainOnly(url) {
-  if (url === 'atom://home' || url.includes('home.html')) {
+  // Si es la home, limpiar la barra
+  if (!url || url === 'atom://home' || url.includes('home.html')) {
     urlInput.value = '';
     urlInput.dataset.fullUrl = '';
     return;
   }
-  try {
-    const urlObj = new URL(url);
-    urlInput.value = urlObj.hostname.replace('www.', '');
-    urlInput.dataset.fullUrl = url;
-  } catch {
-    urlInput.value = url;
-    urlInput.dataset.fullUrl = url;
+
+  // Mostrar URL completa en lugar de solo dominio
+  urlInput.value = url;
+  urlInput.dataset.fullUrl = url;
+}
+
+// --- URL SUGGESTIONS ---
+const urlSuggestions = document.getElementById("url-suggestions");
+let selectedSuggestionIndex = -1;
+let currentSuggestions = [];
+
+function getSuggestions(query) {
+  if (!query || query.length < 2) return [];
+
+  const q = query.toLowerCase();
+  const results = [];
+
+  // Search bookmarks first (higher priority)
+  const bookmarks = getBookmarks();
+  bookmarks.forEach(b => {
+    const url = (b.url || '').toLowerCase();
+    const title = (b.title || '').toLowerCase();
+    if (url.includes(q) || title.includes(q)) {
+      results.push({ type: 'bookmark', url: b.url, title: b.title || b.url });
+    }
+  });
+
+  // Then search history
+  const history = JSON.parse(localStorage.getItem("atom-history") || "[]");
+  history.forEach(h => {
+    const url = (h.url || '').toLowerCase();
+    // Avoid duplicates with bookmarks
+    if (url.includes(q) && !results.some(r => r.url === h.url)) {
+      results.push({ type: 'history', url: h.url, title: h.url });
+    }
+  });
+
+  // Limit results
+  return results.slice(0, 8);
+}
+
+function renderSuggestions(suggestions) {
+  if (suggestions.length === 0) {
+    urlSuggestions.classList.add("hidden");
+    return;
+  }
+
+  currentSuggestions = suggestions;
+  selectedSuggestionIndex = -1;
+
+  urlSuggestions.innerHTML = suggestions.map((s, i) => {
+    const icon = s.type === 'bookmark'
+      ? '<svg class="suggestion-icon bookmark" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
+      : '<svg class="suggestion-icon history" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+
+    const displayText = s.title || s.url;
+    const typeLabel = s.type === 'bookmark' ? 'Marcador' : 'Historial';
+
+    return `
+      <div class="suggestion-item" data-index="${i}" data-url="${s.url}">
+        ${icon}
+        <span class="suggestion-text">${displayText}</span>
+        <span class="suggestion-type">${typeLabel}</span>
+      </div>
+    `;
+  }).join('');
+
+  urlSuggestions.classList.remove("hidden");
+
+  // Add click handlers
+  urlSuggestions.querySelectorAll('.suggestion-item').forEach(item => {
+    item.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const url = item.dataset.url;
+      if (url) {
+        urlInput.value = url;
+        urlSuggestions.classList.add("hidden");
+        handleNavigation();
+      }
+    });
+  });
+}
+
+function updateSelectedSuggestion() {
+  urlSuggestions.querySelectorAll('.suggestion-item').forEach((item, i) => {
+    item.classList.toggle('selected', i === selectedSuggestionIndex);
+  });
+
+  // Update input value to show selected suggestion
+  if (selectedSuggestionIndex >= 0 && currentSuggestions[selectedSuggestionIndex]) {
+    urlInput.value = currentSuggestions[selectedSuggestionIndex].url;
   }
 }
+
+function hideSuggestions() {
+  urlSuggestions.classList.add("hidden");
+  selectedSuggestionIndex = -1;
+  currentSuggestions = [];
+}
+
+// Input handler for suggestions
+const handleSuggestionsInput = debounce(() => {
+  const query = urlInput.value.trim();
+  const suggestions = getSuggestions(query);
+  renderSuggestions(suggestions);
+}, 150);
+
+urlInput.addEventListener('input', handleSuggestionsInput);
 
 urlInput.addEventListener('focus', () => {
   if (urlInput.dataset.fullUrl) {
     urlInput.value = urlInput.dataset.fullUrl;
     urlInput.select();
   }
-});
-
-urlInput.addEventListener('blur', () => {
-  if (urlInput.dataset.fullUrl && urlInput.value === urlInput.dataset.fullUrl) {
-    showDomainOnly(urlInput.dataset.fullUrl);
+  // Show suggestions if there's text
+  const query = urlInput.value.trim();
+  if (query.length >= 2) {
+    const suggestions = getSuggestions(query);
+    renderSuggestions(suggestions);
   }
 });
 
-// --- EVENTOS DE NAVEGACIÓN ---
+urlInput.addEventListener('blur', () => {
+  // Delay to allow click on suggestion
+  setTimeout(() => {
+    hideSuggestions();
+    if (urlInput.dataset.fullUrl && urlInput.value === urlInput.dataset.fullUrl) {
+      showDomainOnly(urlInput.dataset.fullUrl);
+    }
+  }, 150);
+});
+
+// Keyboard navigation for suggestions
+urlInput.addEventListener('keydown', (e) => {
+  if (urlSuggestions.classList.contains('hidden')) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    selectedSuggestionIndex = Math.min(selectedSuggestionIndex + 1, currentSuggestions.length - 1);
+    updateSelectedSuggestion();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, -1);
+    updateSelectedSuggestion();
+  } else if (e.key === 'Escape') {
+    hideSuggestions();
+  }
+});
+
+// --- ATOM SHIELD TOGGLE ---
+btnAdblock.addEventListener("click", async () => {
+  try {
+    const newState = await invoke("toggle-adblock");
+    isAdblockEnabled = newState;
+    btnAdblock.classList.toggle("active", newState);
+    btnAdblock.title = newState ? "Atom Shield: Activo" : "Atom Shield: Desactivado";
+  } catch (e) {
+    console.error("Error toggling adblock:", e);
+  }
+});
+
+// --- EVENTOS DOM ---
 urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") handleNavigation(); });
 btnGo.addEventListener("click", handleNavigation);
 btnBack.addEventListener("click", () => invoke("go_back"));
 btnForward.addEventListener("click", () => invoke("go_forward"));
 btnRefresh.addEventListener("click", () => { startLoading(); invoke("reload"); });
-btnNewTab.addEventListener("click", () => createTab());
+btnNewTab.addEventListener("click", () => {
+  console.log("Click en nueva pestaña"); // Para depurar si falla
+  createTab();
+});
 
-// --- OVERLAY MANAGER (oculta webview activo para que los overlays se vean) ---
+// --- OVERLAYS MANAGER ---
 const allOverlays = () => [historyOverlay, bookmarksOverlay, searchEngineOverlay];
 
 function isAnyOverlayOpen() {
@@ -348,44 +630,31 @@ function isAnyOverlayOpen() {
 
 function showOverlay(overlay) {
   overlay.classList.remove("hidden");
-  invoke("hide_active_tab");
+  // Opcional: Si quieres ocultar la webview al abrir overlay (mejor rendimiento)
+  // invoke("hide_active_tab"); 
 }
 
 function hideOverlay(overlay) {
   overlay.classList.add("hidden");
-  // Solo mostrar el webview si no hay ningún otro overlay abierto
-  if (!isAnyOverlayOpen()) {
-    invoke("show_active_tab");
-  }
+  // invoke("show_active_tab");
 }
 
 function hideAllOverlays() {
   allOverlays().forEach(o => o.classList.add("hidden"));
   downloadsOverlay.classList.add("hidden");
   dropdownMenu.classList.add("hidden");
-  invoke("show_active_tab");
 }
 
 // --- MENÚ ---
 btnMenu.addEventListener("click", (e) => {
   e.stopPropagation();
   downloadsOverlay.classList.add("hidden");
-  const wasHidden = dropdownMenu.classList.contains("hidden");
   dropdownMenu.classList.toggle("hidden");
-  if (wasHidden) {
-    invoke("hide_active_tab");
-  } else if (!isAnyOverlayOpen()) {
-    invoke("show_active_tab");
-  }
 });
+
 document.addEventListener("click", () => {
-  if (!dropdownMenu.classList.contains("hidden")) {
-    dropdownMenu.classList.add("hidden");
-    if (!isAnyOverlayOpen()) invoke("show_active_tab");
-  }
-  if (!downloadsOverlay.classList.contains("hidden")) {
-    downloadsOverlay.classList.add("hidden");
-  }
+  if (!dropdownMenu.classList.contains("hidden")) dropdownMenu.classList.add("hidden");
+  if (!downloadsOverlay.classList.contains("hidden")) downloadsOverlay.classList.add("hidden");
 });
 
 menuHistory.addEventListener("click", () => {
@@ -436,25 +705,20 @@ document.addEventListener("keydown", (e) => {
   if (e.ctrlKey && !e.shiftKey && e.key === "Tab") {
     e.preventDefault();
     const tabIds = Array.from(tabs.keys());
-    const idx = tabIds.indexOf(activeTabId);
-    switchTab(tabIds[(idx + 1) % tabIds.length]);
-  }
-  if (e.ctrlKey && e.shiftKey && e.key === "Tab") {
-    e.preventDefault();
-    const tabIds = Array.from(tabs.keys());
-    const idx = tabIds.indexOf(activeTabId);
-    switchTab(tabIds[(idx - 1 + tabIds.length) % tabIds.length]);
+    if (tabIds.length > 0) {
+      const idx = tabIds.indexOf(activeTabId);
+      switchTab(tabIds[(idx + 1) % tabIds.length]);
+    }
   }
 
-  if (e.key === "Escape") {
-    hideAllOverlays();
-  }
+  if (e.key === "Escape") hideAllOverlays();
+
   if (e.ctrlKey && e.key === "h") {
     e.preventDefault();
     if (historyOverlay.classList.contains("hidden")) { renderHistory(); showOverlay(historyOverlay); }
     else hideOverlay(historyOverlay);
   }
-  if (e.ctrlKey && e.key === "d") { e.preventDefault(); toggleBookmark(); }
+
   if (e.ctrlKey && e.key === "j") {
     e.preventDefault();
     if (downloadsOverlay.classList.contains("hidden")) { downloadsOverlay.classList.remove("hidden"); renderDownloads(); }
@@ -468,7 +732,7 @@ function isBookmarked(url) { return getBookmarks().some(b => b.url === url); }
 
 function toggleBookmark() {
   const url = tabs.get(activeTabId)?.url;
-  if (!url || url === "about:blank") return;
+  if (!url || url === "about:blank" || url.includes("home.html")) return;
 
   let bookmarks = getBookmarks();
   const exists = bookmarks.findIndex(b => b.url === url);
@@ -485,11 +749,8 @@ function toggleBookmark() {
 
 function updateBookmarkStar() {
   const url = tabs.get(activeTabId)?.url;
-  if (isBookmarked(url)) {
-    btnBookmark.classList.add("bookmarked");
-  } else {
-    btnBookmark.classList.remove("bookmarked");
-  }
+  if (isBookmarked(url)) btnBookmark.classList.add("bookmarked");
+  else btnBookmark.classList.remove("bookmarked");
 }
 
 function renderBookmarks() {
@@ -501,7 +762,7 @@ function renderBookmarks() {
     item.className = "bookmark-item";
     item.innerHTML = `
       <span class="url">${b.title || b.url}</span>
-      <button class="delete-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="delete-btn">×</button>
     `;
     item.querySelector(".url").addEventListener("click", () => {
       invoke("navigate", { url: b.url });
@@ -518,46 +779,13 @@ function renderBookmarks() {
   });
 }
 
-// --- HISTORIAL ---
-function renderHistory() {
-  const history = JSON.parse(localStorage.getItem("atom-history") || "[]");
-  const fragment = document.createDocumentFragment();
-
-  if (history.length === 0) {
-    historyList.innerHTML = '<div class="empty-state">Sin historial</div>';
-    return;
-  }
-
-  history.slice(0, 50).forEach(h => {
-    const item = document.createElement("div");
-    item.className = "history-item";
-    const date = new Date(h.time);
-    const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const safeUrl = h.url.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    item.innerHTML = `
-      <span class="url">${safeUrl}</span>
-      <span class="time">${timeStr}</span>
-    `;
-    item.addEventListener("click", () => {
-      invoke("navigate", { url: h.url });
-      hideOverlay(historyOverlay);
-    });
-    fragment.appendChild(item);
-  });
-
-  historyList.innerHTML = "";
-  historyList.appendChild(fragment);
-}
-
 btnBookmark.addEventListener("click", toggleBookmark);
 btnCloseHistory.addEventListener("click", () => hideOverlay(historyOverlay));
 btnClearHistory.addEventListener("click", () => { localStorage.removeItem("atom-history"); renderHistory(); });
 btnBookmark.addEventListener("contextmenu", (e) => { e.preventDefault(); renderBookmarks(); showOverlay(bookmarksOverlay); });
 btnCloseBookmarks.addEventListener("click", () => hideOverlay(bookmarksOverlay));
 
-// ================================================================
-// GESTOR DE DESCARGAS (integrado como overlay)
-// ================================================================
+// --- GESTOR DE DESCARGAS ---
 const downloads = new Map();
 
 function getDownloadsHistory() { return JSON.parse(localStorage.getItem("atom-downloads") || "[]"); }
@@ -565,11 +793,9 @@ function saveDownloadsHistory(list) { localStorage.setItem("atom-downloads", JSO
 
 function updateDownloadBtn() {
   const history = getDownloadsHistory();
-  if (history.length > 0 || downloads.size > 0) {
-    btnDownloads.classList.remove("hidden");
-  } else {
-    btnDownloads.classList.add("hidden");
-  }
+  if (history.length > 0 || downloads.size > 0) btnDownloads.classList.remove("hidden");
+  else btnDownloads.classList.add("hidden");
+
   const hasActive = Array.from(downloads.values()).some(d => d.state === 'progress');
   btnDownloads.classList.toggle("downloading", hasActive);
 }
@@ -583,21 +809,7 @@ function formatBytes(bytes) {
 }
 
 function getFileIcon(filename) {
-  const ext = (filename || '').split('.').pop().toLowerCase();
-  // Document icon (default)
-  const docIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
-  const imgIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
-  const videoIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
-  const audioIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
-  const zipIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V3h13l5 5z"/><path d="M12 3v6h-2V3"/><path d="M10 9h2v2h-2z"/><path d="M12 11v2h-2v-2"/></svg>';
-  const exeIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
-
-  if (['jpg','jpeg','png','gif','svg','webp','bmp','ico'].includes(ext)) return imgIcon;
-  if (['mp4','mkv','avi','mov','webm','flv','wmv'].includes(ext)) return videoIcon;
-  if (['mp3','wav','ogg','flac','aac','wma','m4a'].includes(ext)) return audioIcon;
-  if (['zip','rar','7z','tar','gz','bz2','xz'].includes(ext)) return zipIcon;
-  if (['exe','msi','dmg','appimage','deb','rpm'].includes(ext)) return exeIcon;
-  return docIcon;
+  return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
 }
 
 function renderDownloads() {
@@ -632,23 +844,21 @@ function renderDownloads() {
       }
     } else if (d.state === 'finished') {
       stateClass = 'completed';
-      statusText = d.total > 0 ? `${formatBytes(d.total)} \u2022 Completado` : 'Completado';
+      statusText = d.total > 0 ? `${formatBytes(d.total)} • Completado` : 'Completado';
       progressWidth = '100%';
       progressClass += ' complete';
     } else {
       stateClass = 'error';
-      statusText = 'Error en la descarga';
+      statusText = 'Error';
       progressWidth = '100%';
       progressClass += ' error';
     }
 
     item.className = `download-item ${stateClass}`;
-
-    const iconSvg = getFileIcon(d.filename);
     const safeName = (d.filename || 'Descarga').replace(/</g, '&lt;');
 
     item.innerHTML = `
-      <div class="download-icon">${iconSvg}</div>
+      <div class="download-icon">${getFileIcon(d.filename)}</div>
       <div class="download-info">
         <div class="download-name" title="${safeName}">${safeName}</div>
         <div class="download-meta">${statusText}</div>
@@ -657,7 +867,6 @@ function renderDownloads() {
         <div class="${progressClass}" style="width: ${progressWidth}"></div>
       </div>
     `;
-
     fragment.appendChild(item);
   });
 
@@ -665,22 +874,20 @@ function renderDownloads() {
   downloadsList.appendChild(fragment);
 }
 
-// Botón descargas — toggle dropdown panel
+// Botón descargas
 btnDownloads.addEventListener("click", (e) => {
   e.stopPropagation();
   const wasHidden = downloadsOverlay.classList.contains("hidden");
+  dropdownMenu.classList.add("hidden");
   if (wasHidden) {
-    dropdownMenu.classList.add("hidden");
     downloadsOverlay.classList.remove("hidden");
     renderDownloads();
   } else {
     downloadsOverlay.classList.add("hidden");
   }
 });
-
 downloadsOverlay.addEventListener("click", (e) => e.stopPropagation());
 btnCloseDownloads.addEventListener("click", () => downloadsOverlay.classList.add("hidden"));
-
 btnClearDownloads.addEventListener("click", () => {
   localStorage.removeItem("atom-downloads");
   downloads.clear();
@@ -688,12 +895,11 @@ btnClearDownloads.addEventListener("click", () => {
   renderDownloads();
 });
 
-// --- EVENTOS DE DESCARGAS ---
+// Listeners de Descargas
 listen('download-started', (event) => {
   const { id, filename, path } = event.payload;
   downloads.set(id, { id, filename, path, current: 0, total: 0, state: 'progress' });
   updateDownloadBtn();
-  // Auto-mostrar panel cuando empieza descarga
   downloadsOverlay.classList.remove("hidden");
   renderDownloads();
 });
@@ -704,7 +910,6 @@ listen('download-progress', (event) => {
   if (d) {
     d.current = current;
     d.total = total;
-    // Actualizar UI en tiempo real si overlay está visible
     if (!downloadsOverlay.classList.contains("hidden")) renderDownloads();
   }
 });
@@ -729,19 +934,13 @@ updateDownloadBtn();
 
 // --- INICIALIZACIÓN ---
 async function init() {
-  try {
-    let tabId = await invoke("get_active_tab");
-    if (!tabId) {
-      await createTab();
-      return;
-    }
-    tabs.set(tabId, { url: "about:blank", title: "Nueva pestaña" });
-    activeTabId = tabId;
-    const tabEl = createTabElement(tabId, true);
-    tabsContainer.insertBefore(tabEl, btnNewTab);
-  } catch (error) {
-    console.error("Error inicializando:", error);
-  }
+  // Consultar estado del adblock
+  const adState = await invoke("get-adblock-state");
+  isAdblockEnabled = adState !== false;
+  btnAdblock.classList.toggle("active", isAdblockEnabled);
+  btnAdblock.title = isAdblockEnabled ? "Atom Shield: Activo" : "Atom Shield: Desactivado";
+
+  await createTab();
 }
 
 init();

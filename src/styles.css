@@ -49,13 +49,13 @@
 /* Transiciones base para title-bar y control-bar */
 #title-bar {
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   transform-origin: top center;
 }
 
 #control-bar {
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) 0.05s,
-              opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
+    opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
   transform-origin: top center;
 }
 
@@ -107,14 +107,14 @@ body.fullscreen-showing #title-bar {
   transform: translateY(0);
   opacity: 1;
   transition: transform 0.3s cubic-bezier(0, 0, 0.2, 1) 0.1s,
-              opacity 0.25s cubic-bezier(0, 0, 0.2, 1) 0.1s;
+    opacity 0.25s cubic-bezier(0, 0, 0.2, 1) 0.1s;
 }
 
 body.fullscreen-showing #control-bar {
   transform: translateY(0);
   opacity: 1;
   transition: transform 0.3s cubic-bezier(0, 0, 0.2, 1) 0.15s,
-              opacity 0.25s cubic-bezier(0, 0, 0.2, 1) 0.15s;
+    opacity 0.25s cubic-bezier(0, 0, 0.2, 1) 0.15s;
 }
 
 /* ===== RESET ===== */
@@ -154,15 +154,6 @@ body {
   -webkit-app-region: drag;
 }
 
-#browser-icon {
-  width: 18px;
-  height: 18px;
-  border-radius: var(--radius-sm);
-  margin-right: var(--space-xs);
-  flex-shrink: 0;
-  object-fit: contain;
-  opacity: 0.9;
-}
 
 /* ===== CONTROLES DE VENTANA ===== */
 #window-controls {
@@ -209,17 +200,27 @@ body {
 /* ===== CONTENEDOR DE PESTAÑAS ===== */
 #tabs-container {
   display: flex;
-  gap: var(--space-xs);
+  gap: 2px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  flex: 1;
+  flex-shrink: 1;
   align-items: center;
   min-width: 0;
+  -webkit-app-region: no-drag;
+  padding: 2px 0;
 }
 
 #tabs-container::-webkit-scrollbar {
   display: none;
+}
+
+/* ===== DRAG SPACER (toda el area libre = arrastrable) ===== */
+#drag-spacer {
+  flex: 1;
+  min-width: 40px;
+  height: 100%;
+  -webkit-app-region: drag;
 }
 
 /* ===== PESTAÑA ===== */
@@ -332,6 +333,37 @@ body {
   color: var(--accent-danger);
 }
 
+/* Tab drag-and-drop reordering */
+.tab.dragging {
+  opacity: 0.3;
+  transform: scale(0.95);
+}
+
+.tab-drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+  opacity: 0.9;
+  transform: scale(1.04);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4), 0 0 0 1px var(--accent-primary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  transition: none;
+}
+
+.tab-drop-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--accent-primary);
+  border-radius: 2px;
+  z-index: 200;
+  pointer-events: none;
+  box-shadow: 0 0 6px var(--accent-primary);
+  transition: left 100ms ease-out;
+}
+
 /* ===== BOTÓN NUEVA PESTAÑA ===== */
 #btn-new-tab {
   background: transparent;
@@ -349,6 +381,7 @@ body {
   transition: all var(--transition-base);
   flex-shrink: 0;
   margin-left: var(--space-xs);
+  -webkit-app-region: no-drag;
 }
 
 #btn-new-tab:hover {
@@ -364,6 +397,7 @@ body {
 
 /* ===== BARRA DE CONTROL ===== */
 #control-bar {
+  position: relative;
   background: var(--bg-elevated);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -432,6 +466,16 @@ body {
 
 #btn-adblock.active::before {
   opacity: 0;
+}
+
+#btn-adblock:not(.active) {
+  color: var(--text-tertiary);
+  background: transparent;
+  box-shadow: none;
+}
+
+#btn-adblock:not(.active):hover {
+  color: var(--text-secondary);
 }
 
 #btn-bookmark.bookmarked {
@@ -516,6 +560,110 @@ body {
 
 #url-bar::selection {
   background: rgba(107, 158, 255, 0.3);
+}
+
+/* ===== URL SUGGESTIONS DROPDOWN ===== */
+.url-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 200px);
+  max-width: 600px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 1002;
+  margin-top: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-medium) transparent;
+}
+
+.url-suggestions.hidden {
+  display: none;
+}
+
+.url-suggestions::-webkit-scrollbar {
+  width: 6px;
+}
+
+.url-suggestions::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.url-suggestions::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 3px;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover,
+.suggestion-item.selected {
+  background: var(--bg-input);
+}
+
+.suggestion-item.selected {
+  background: rgba(107, 158, 255, 0.15);
+}
+
+.suggestion-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  opacity: 0.8;
+}
+
+.suggestion-icon.search {
+  color: var(--text-tertiary);
+}
+
+.suggestion-icon.bookmark {
+  color: var(--accent-warning);
+}
+
+.suggestion-icon.history {
+  color: var(--text-tertiary);
+}
+
+.suggestion-text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.suggestion-item:hover .suggestion-text,
+.suggestion-item.selected .suggestion-text {
+  color: var(--text-primary);
+}
+
+.suggestion-type {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
 }
 
 /* ===== BARRA DE PROGRESO ===== */
@@ -1084,8 +1232,7 @@ body {
 }
 
 /* ===== OCULTOS ===== */
-#btn-go,
-#favicon {
+#btn-go {
   display: none;
 }
 
@@ -1123,11 +1270,6 @@ body {
 @media (max-width: 480px) {
   #title-bar {
     padding: var(--space-xs);
-  }
-
-  #browser-icon {
-    width: 16px;
-    height: 16px;
   }
 
   .tab {
