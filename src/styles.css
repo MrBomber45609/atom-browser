@@ -41,6 +41,80 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ===== FULLSCREEN TRANSITION (2 PASOS) ===== */
+
+/* Transiciones base para title-bar y control-bar */
+#title-bar {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: top center;
+}
+
+#control-bar {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) 0.05s,
+              opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
+  transform-origin: top center;
+}
+
+/* Paso 1: UI se desliza hacia arriba y desaparece */
+body.fullscreen-hiding #title-bar {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.fullscreen-hiding #control-bar {
+  transform: translateY(-72px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.fullscreen-hiding #progress-bar,
+body.fullscreen-hiding #dropdown-menu {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Paso 2: Fullscreen completo — todo oculto */
+body.fullscreen-mode #title-bar,
+body.fullscreen-mode #control-bar,
+body.fullscreen-mode #progress-bar,
+body.fullscreen-mode #dropdown-menu {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+  height: 0;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+}
+
+body.fullscreen-mode {
+  background-color: #000 !important;
+  overflow: hidden !important;
+}
+
+body.fullscreen-mode #tabs-container,
+body.fullscreen-mode #url-bar {
+  display: none !important;
+}
+
+/* Animación de salida: UI reaparece deslizándose */
+body.fullscreen-showing #title-bar {
+  transform: translateY(0);
+  opacity: 1;
+  transition: transform 0.3s cubic-bezier(0, 0, 0.2, 1) 0.1s,
+              opacity 0.25s cubic-bezier(0, 0, 0.2, 1) 0.1s;
+}
+
+body.fullscreen-showing #control-bar {
+  transform: translateY(0);
+  opacity: 1;
+  transition: transform 0.3s cubic-bezier(0, 0, 0.2, 1) 0.15s,
+              opacity 0.25s cubic-bezier(0, 0, 0.2, 1) 0.15s;
 }
 
 /* ===== RESET ===== */
@@ -362,7 +436,11 @@ body {
 
 #btn-bookmark.bookmarked {
   color: var(--accent-warning);
-  text-shadow: 0 0 8px rgba(255, 193, 89, 0.3);
+}
+
+#btn-bookmark.bookmarked svg {
+  fill: var(--accent-warning);
+  filter: drop-shadow(0 0 6px rgba(255, 193, 89, 0.3));
 }
 
 #btn-downloads {
@@ -894,6 +972,115 @@ body {
   text-align: center;
   color: var(--text-muted);
   font-size: 13px;
+}
+
+/* ===== PANEL DE DESCARGAS (DROPDOWN) ===== */
+.downloads-panel {
+  position: fixed;
+  top: 72px;
+  right: var(--space-md);
+  width: 340px;
+  max-height: 420px;
+  background: var(--bg-elevated);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform-origin: top right;
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+
+.downloads-panel.hidden {
+  opacity: 0;
+  transform: scale(0.96) translateY(-8px);
+  pointer-events: none;
+}
+
+.downloads-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.downloads-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.downloads-panel-close {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.downloads-panel-close:hover {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.downloads-panel #downloads-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-xs);
+  max-height: 300px;
+}
+
+.downloads-panel .download-item {
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: 0;
+  border-radius: var(--radius-sm);
+}
+
+.downloads-panel .download-icon {
+  width: 28px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-sm);
+}
+
+.downloads-panel .download-name {
+  font-size: 12px;
+}
+
+.downloads-panel .download-meta {
+  font-size: 11px;
+}
+
+.downloads-panel-clear {
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-size: 12px;
+  padding: var(--space-sm) var(--space-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.downloads-panel-clear:hover {
+  background: var(--bg-input);
+  color: var(--text-secondary);
 }
 
 /* ===== OCULTOS ===== */

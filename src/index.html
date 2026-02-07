@@ -40,14 +40,24 @@
 
   <!-- Barra de control unificada -->
   <div id="control-bar">
-    <button id="btn-back" title="Atrás">‹</button>
-    <button id="btn-forward" title="Adelante">›</button>
-    <button id="btn-refresh" title="Recargar">↻</button>
+    <button id="btn-back" title="Atrás">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <button id="btn-forward" title="Adelante">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+    <button id="btn-refresh" title="Recargar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    </button>
 
     <input type="text" id="url-bar" placeholder="Buscar o escribir URL" autocomplete="off">
 
-    <button id="btn-bookmark" title="Añadir a marcadores">☆</button>
-    <button id="btn-adblock" class="active" title="Atom Shield: Siempre Activo">🛡</button>
+    <button id="btn-bookmark" title="Añadir a marcadores">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    </button>
+    <button id="btn-adblock" class="active" title="Atom Shield: Siempre Activo">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </button>
 
     <!-- Descargas -->
     <button id="btn-downloads" class="hidden" title="Descargas">
@@ -59,29 +69,42 @@
       </svg>
     </button>
 
-    <button id="btn-menu" title="Menú">⋮</button>
+    <button id="btn-menu" title="Menú">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+    </button>
   </div>
 
-  <!-- Menú desplegable -->
+  <!-- Menu desplegable -->
   <div id="dropdown-menu" class="hidden">
-    <div class="menu-item" id="menu-history"><span>🕒</span> Historial</div>
-    <div class="menu-item" id="menu-search-engine"><span>🔍</span> Motor de búsqueda</div>
+    <div class="menu-item" id="menu-history">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Historial
+    </div>
+    <div class="menu-item" id="menu-search-engine">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Motor de busqueda
+    </div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="menu-bookmarks"><span>⭐</span> Marcadores</div>
+    <div class="menu-item" id="menu-bookmarks">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      Marcadores
+    </div>
   </div>
 
-  <!-- Selector de motor de búsqueda -->
+  <!-- Selector de motor de busqueda -->
   <div id="search-engine-overlay" class="overlay hidden">
     <div class="overlay-content small">
       <div class="overlay-header">
-        <h3>🔍 Motor de búsqueda</h3>
-        <button id="btn-close-search-engine" class="overlay-close">✕</button>
+        <h3>Motor de busqueda</h3>
+        <button id="btn-close-search-engine" class="overlay-close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="search-engine-list">
-        <div class="search-engine-item" data-engine="duckduckgo"><span>🦆</span> DuckDuckGo</div>
-        <div class="search-engine-item" data-engine="google"><span>🔍</span> Google</div>
-        <div class="search-engine-item" data-engine="brave"><span>🦁</span> Brave</div>
-        <div class="search-engine-item" data-engine="startpage"><span>🔒</span> Startpage</div>
+        <div class="search-engine-item" data-engine="duckduckgo">DuckDuckGo</div>
+        <div class="search-engine-item" data-engine="google">Google</div>
+        <div class="search-engine-item" data-engine="brave">Brave</div>
+        <div class="search-engine-item" data-engine="startpage">Startpage</div>
       </div>
     </div>
   </div>
@@ -90,8 +113,10 @@
   <div id="history-overlay" class="overlay hidden">
     <div class="overlay-content">
       <div class="overlay-header">
-        <h3>📜 Historial</h3>
-        <button id="btn-close-history" class="overlay-close">✕</button>
+        <h3>Historial</h3>
+        <button id="btn-close-history" class="overlay-close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div id="history-list"></div>
       <button id="btn-clear-history" class="overlay-action">Borrar todo</button>
@@ -102,23 +127,25 @@
   <div id="bookmarks-overlay" class="overlay hidden">
     <div class="overlay-content">
       <div class="overlay-header">
-        <h3>⭐ Marcadores</h3>
-        <button id="btn-close-bookmarks" class="overlay-close">✕</button>
+        <h3>Marcadores</h3>
+        <button id="btn-close-bookmarks" class="overlay-close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div id="bookmarks-list"></div>
     </div>
   </div>
 
-  <!-- Overlay de Descargas (integrado, mismo estilo) -->
-  <div id="downloads-overlay" class="overlay hidden">
-    <div class="overlay-content">
-      <div class="overlay-header">
-        <h3>📥 Descargas</h3>
-        <button id="btn-close-downloads" class="overlay-close">✕</button>
-      </div>
-      <div id="downloads-list"></div>
-      <button id="btn-clear-downloads" class="overlay-action">Limpiar todo</button>
+  <!-- Panel de Descargas (dropdown compacto) -->
+  <div id="downloads-overlay" class="downloads-panel hidden">
+    <div class="downloads-panel-header">
+      <span class="downloads-panel-title">Descargas recientes</span>
+      <button id="btn-close-downloads" class="downloads-panel-close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      </button>
     </div>
+    <div id="downloads-list"></div>
+    <button id="btn-clear-downloads" class="downloads-panel-clear">Limpiar todo</button>
   </div>
 
   <img id="favicon" src="" alt="" style="display:none" />

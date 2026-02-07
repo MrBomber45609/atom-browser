@@ -279,6 +279,28 @@ listen('url-changed', (event) => {
   if (id === activeTabId) updateBookmarkStar();
 });
 
+// --- FULLSCREEN IMMERSIVE (2 PASOS) ---
+listen('fullscreen-change', (event) => {
+  const isFullscreen = event.payload;
+  if (isFullscreen) {
+    // Paso 1: Animar UI hacia arriba
+    document.body.classList.add('fullscreen-hiding');
+    // Paso 2: Después de la animación, aplicar fullscreen completo
+    setTimeout(() => {
+      document.body.classList.remove('fullscreen-hiding');
+      document.body.classList.add('fullscreen-mode');
+    }, 280);
+  } else {
+    // Paso 1: Quitar fullscreen y mostrar UI con animación
+    document.body.classList.remove('fullscreen-mode');
+    document.body.classList.add('fullscreen-showing');
+    // Paso 2: Limpiar clase de animación
+    setTimeout(() => {
+      document.body.classList.remove('fullscreen-showing');
+    }, 400);
+  }
+});
+
 // --- URL BAR ---
 function showDomainOnly(url) {
   if (url === 'atom://home' || url.includes('home.html')) {
@@ -317,26 +339,71 @@ btnForward.addEventListener("click", () => invoke("go_forward"));
 btnRefresh.addEventListener("click", () => { startLoading(); invoke("reload"); });
 btnNewTab.addEventListener("click", () => createTab());
 
+// --- OVERLAY MANAGER (oculta webview activo para que los overlays se vean) ---
+const allOverlays = () => [historyOverlay, bookmarksOverlay, searchEngineOverlay];
+
+function isAnyOverlayOpen() {
+  return allOverlays().some(o => !o.classList.contains("hidden")) || !dropdownMenu.classList.contains("hidden");
+}
+
+function showOverlay(overlay) {
+  overlay.classList.remove("hidden");
+  invoke("hide_active_tab");
+}
+
+function hideOverlay(overlay) {
+  overlay.classList.add("hidden");
+  // Solo mostrar el webview si no hay ningún otro overlay abierto
+  if (!isAnyOverlayOpen()) {
+    invoke("show_active_tab");
+  }
+}
+
+function hideAllOverlays() {
+  allOverlays().forEach(o => o.classList.add("hidden"));
+  downloadsOverlay.classList.add("hidden");
+  dropdownMenu.classList.add("hidden");
+  invoke("show_active_tab");
+}
+
 // --- MENÚ ---
-btnMenu.addEventListener("click", (e) => { e.stopPropagation(); dropdownMenu.classList.toggle("hidden"); });
-document.addEventListener("click", () => dropdownMenu.classList.add("hidden"));
+btnMenu.addEventListener("click", (e) => {
+  e.stopPropagation();
+  downloadsOverlay.classList.add("hidden");
+  const wasHidden = dropdownMenu.classList.contains("hidden");
+  dropdownMenu.classList.toggle("hidden");
+  if (wasHidden) {
+    invoke("hide_active_tab");
+  } else if (!isAnyOverlayOpen()) {
+    invoke("show_active_tab");
+  }
+});
+document.addEventListener("click", () => {
+  if (!dropdownMenu.classList.contains("hidden")) {
+    dropdownMenu.classList.add("hidden");
+    if (!isAnyOverlayOpen()) invoke("show_active_tab");
+  }
+  if (!downloadsOverlay.classList.contains("hidden")) {
+    downloadsOverlay.classList.add("hidden");
+  }
+});
 
 menuHistory.addEventListener("click", () => {
   dropdownMenu.classList.add("hidden");
   renderHistory();
-  historyOverlay.classList.remove("hidden");
+  showOverlay(historyOverlay);
 });
 
 menuSearchEngine.addEventListener("click", () => {
   dropdownMenu.classList.add("hidden");
   updateSearchEngineSelection();
-  searchEngineOverlay.classList.remove("hidden");
+  showOverlay(searchEngineOverlay);
 });
 
 menuBookmarks.addEventListener("click", () => {
   dropdownMenu.classList.add("hidden");
   renderBookmarks();
-  bookmarksOverlay.classList.remove("hidden");
+  showOverlay(bookmarksOverlay);
 });
 
 // --- MOTOR DE BÚSQUEDA ---
@@ -351,11 +418,11 @@ searchEngineItems.forEach(item => {
     currentSearchEngine = item.dataset.engine;
     localStorage.setItem("atom-search-engine", currentSearchEngine);
     updateSearchEngineSelection();
-    searchEngineOverlay.classList.add("hidden");
+    hideOverlay(searchEngineOverlay);
   });
 });
 
-btnCloseSearchEngine.addEventListener("click", () => searchEngineOverlay.classList.add("hidden"));
+btnCloseSearchEngine.addEventListener("click", () => hideOverlay(searchEngineOverlay));
 
 // --- ATAJOS DE TECLADO ---
 document.addEventListener("keydown", (e) => {
@@ -380,15 +447,19 @@ document.addEventListener("keydown", (e) => {
   }
 
   if (e.key === "Escape") {
-    historyOverlay.classList.add("hidden");
-    bookmarksOverlay.classList.add("hidden");
-    searchEngineOverlay.classList.add("hidden");
-    downloadsOverlay.classList.add("hidden");
-    dropdownMenu.classList.add("hidden");
+    hideAllOverlays();
   }
-  if (e.ctrlKey && e.key === "h") { e.preventDefault(); renderHistory(); historyOverlay.classList.toggle("hidden"); }
+  if (e.ctrlKey && e.key === "h") {
+    e.preventDefault();
+    if (historyOverlay.classList.contains("hidden")) { renderHistory(); showOverlay(historyOverlay); }
+    else hideOverlay(historyOverlay);
+  }
   if (e.ctrlKey && e.key === "d") { e.preventDefault(); toggleBookmark(); }
-  if (e.ctrlKey && e.key === "j") { e.preventDefault(); renderDownloads(); downloadsOverlay.classList.toggle("hidden"); }
+  if (e.ctrlKey && e.key === "j") {
+    e.preventDefault();
+    if (downloadsOverlay.classList.contains("hidden")) { downloadsOverlay.classList.remove("hidden"); renderDownloads(); }
+    else downloadsOverlay.classList.add("hidden");
+  }
 });
 
 // --- MARCADORES ---
@@ -405,11 +476,9 @@ function toggleBookmark() {
   if (exists >= 0) {
     bookmarks.splice(exists, 1);
     btnBookmark.classList.remove("bookmarked");
-    btnBookmark.textContent = "☆";
   } else {
     bookmarks.unshift({ url, title: urlInput.value || url, time: Date.now() });
     btnBookmark.classList.add("bookmarked");
-    btnBookmark.textContent = "★";
   }
   localStorage.setItem("atom-bookmarks", JSON.stringify(bookmarks.slice(0, 100)));
 }
@@ -418,10 +487,8 @@ function updateBookmarkStar() {
   const url = tabs.get(activeTabId)?.url;
   if (isBookmarked(url)) {
     btnBookmark.classList.add("bookmarked");
-    btnBookmark.textContent = "★";
   } else {
     btnBookmark.classList.remove("bookmarked");
-    btnBookmark.textContent = "☆";
   }
 }
 
@@ -434,11 +501,11 @@ function renderBookmarks() {
     item.className = "bookmark-item";
     item.innerHTML = `
       <span class="url">${b.title || b.url}</span>
-      <button class="delete-btn">✕</button>
+      <button class="delete-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     `;
     item.querySelector(".url").addEventListener("click", () => {
       invoke("navigate", { url: b.url });
-      bookmarksOverlay.classList.add("hidden");
+      hideOverlay(bookmarksOverlay);
     });
     item.querySelector(".delete-btn").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -473,7 +540,7 @@ function renderHistory() {
     `;
     item.addEventListener("click", () => {
       invoke("navigate", { url: h.url });
-      historyOverlay.classList.add("hidden");
+      hideOverlay(historyOverlay);
     });
     fragment.appendChild(item);
   });
@@ -483,10 +550,10 @@ function renderHistory() {
 }
 
 btnBookmark.addEventListener("click", toggleBookmark);
-btnCloseHistory.addEventListener("click", () => historyOverlay.classList.add("hidden"));
+btnCloseHistory.addEventListener("click", () => hideOverlay(historyOverlay));
 btnClearHistory.addEventListener("click", () => { localStorage.removeItem("atom-history"); renderHistory(); });
-btnBookmark.addEventListener("contextmenu", (e) => { e.preventDefault(); renderBookmarks(); bookmarksOverlay.classList.remove("hidden"); });
-btnCloseBookmarks.addEventListener("click", () => bookmarksOverlay.classList.add("hidden"));
+btnBookmark.addEventListener("contextmenu", (e) => { e.preventDefault(); renderBookmarks(); showOverlay(bookmarksOverlay); });
+btnCloseBookmarks.addEventListener("click", () => hideOverlay(bookmarksOverlay));
 
 // ================================================================
 // GESTOR DE DESCARGAS (integrado como overlay)
@@ -515,6 +582,24 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
+function getFileIcon(filename) {
+  const ext = (filename || '').split('.').pop().toLowerCase();
+  // Document icon (default)
+  const docIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+  const imgIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+  const videoIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
+  const audioIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+  const zipIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V3h13l5 5z"/><path d="M12 3v6h-2V3"/><path d="M10 9h2v2h-2z"/><path d="M12 11v2h-2v-2"/></svg>';
+  const exeIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
+
+  if (['jpg','jpeg','png','gif','svg','webp','bmp','ico'].includes(ext)) return imgIcon;
+  if (['mp4','mkv','avi','mov','webm','flv','wmv'].includes(ext)) return videoIcon;
+  if (['mp3','wav','ogg','flac','aac','wma','m4a'].includes(ext)) return audioIcon;
+  if (['zip','rar','7z','tar','gz','bz2','xz'].includes(ext)) return zipIcon;
+  if (['exe','msi','dmg','appimage','deb','rpm'].includes(ext)) return exeIcon;
+  return docIcon;
+}
+
 function renderDownloads() {
   const history = getDownloadsHistory();
   const active = Array.from(downloads.values()).reverse();
@@ -527,7 +612,7 @@ function renderDownloads() {
 
   const fragment = document.createDocumentFragment();
 
-  all.slice(0, 30).forEach(d => {
+  all.slice(0, 20).forEach(d => {
     const item = document.createElement("div");
     let stateClass = '';
     let statusText = '';
@@ -538,7 +623,7 @@ function renderDownloads() {
       stateClass = 'active';
       if (d.total > 0) {
         const percent = Math.round((d.current / d.total) * 100);
-        statusText = `${percent}% — ${formatBytes(d.current)} / ${formatBytes(d.total)}`;
+        statusText = `${formatBytes(d.current)} / ${formatBytes(d.total)}`;
         progressWidth = `${percent}%`;
       } else {
         statusText = 'Descargando...';
@@ -547,24 +632,19 @@ function renderDownloads() {
       }
     } else if (d.state === 'finished') {
       stateClass = 'completed';
-      statusText = 'Completado';
+      statusText = d.total > 0 ? `${formatBytes(d.total)} \u2022 Completado` : 'Completado';
       progressWidth = '100%';
       progressClass += ' complete';
     } else {
       stateClass = 'error';
-      statusText = 'Error';
+      statusText = 'Error en la descarga';
       progressWidth = '100%';
       progressClass += ' error';
     }
 
     item.className = `download-item ${stateClass}`;
 
-    const iconSvg = d.state === 'finished'
-      ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>'
-      : d.state === 'error'
-        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
-        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
-
+    const iconSvg = getFileIcon(d.filename);
     const safeName = (d.filename || 'Descarga').replace(/</g, '&lt;');
 
     item.innerHTML = `
@@ -585,12 +665,20 @@ function renderDownloads() {
   downloadsList.appendChild(fragment);
 }
 
-// Botón descargas — abre overlay
-btnDownloads.addEventListener("click", () => {
-  renderDownloads();
-  downloadsOverlay.classList.remove("hidden");
+// Botón descargas — toggle dropdown panel
+btnDownloads.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const wasHidden = downloadsOverlay.classList.contains("hidden");
+  if (wasHidden) {
+    dropdownMenu.classList.add("hidden");
+    downloadsOverlay.classList.remove("hidden");
+    renderDownloads();
+  } else {
+    downloadsOverlay.classList.add("hidden");
+  }
 });
 
+downloadsOverlay.addEventListener("click", (e) => e.stopPropagation());
 btnCloseDownloads.addEventListener("click", () => downloadsOverlay.classList.add("hidden"));
 
 btnClearDownloads.addEventListener("click", () => {
@@ -605,9 +693,9 @@ listen('download-started', (event) => {
   const { id, filename, path } = event.payload;
   downloads.set(id, { id, filename, path, current: 0, total: 0, state: 'progress' });
   updateDownloadBtn();
-  // Auto-mostrar overlay cuando empieza descarga
-  renderDownloads();
+  // Auto-mostrar panel cuando empieza descarga
   downloadsOverlay.classList.remove("hidden");
+  renderDownloads();
 });
 
 listen('download-progress', (event) => {

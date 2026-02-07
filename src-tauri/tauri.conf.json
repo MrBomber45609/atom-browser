@@ -15,7 +15,8 @@
         "width": 1200,
         "height": 800,
         "decorations": false,
-        "transparent": false
+        "transparent": false,
+        "backgroundColor": [0, 0, 0, 255]
       }
     ],
     "security": {
