@@ -28,7 +28,7 @@ const BLOCKED_DOMAINS = [
     'addthis.com', 'medianet.com',
 ];
 
-// Dominios esenciales de YouTube que NUNCA se bloquean a nivel de red
+// Dominios esenciales de YouTube/Google que NUNCA se bloquean a nivel de red
 const YOUTUBE_WHITELIST = [
     'googlevideo.com',
     'ytimg.com',
@@ -39,6 +39,11 @@ const YOUTUBE_WHITELIST = [
     'youtube-ui.l.google.com',
     'jnn-pa.googleapis.com',
     'play.google.com',
+    // Google CDN: fuentes, iconos Material Design, assets estaticos
+    'gstatic.com',
+    'fonts.googleapis.com',
+    // Contenido de usuario: avatares, fotos de canal
+    'googleusercontent.com',
 ];
 
 class AtomShield {
@@ -95,6 +100,10 @@ class AtomShield {
         return script;
     }
 
+    _isBenchmarkDomain(url) {
+        return url.includes('browserbench.org') || url.includes('speedometer');
+    }
+
     _isYouTubeDomain(url) {
         for (const domain of YOUTUBE_WHITELIST) {
             if (url.includes(domain)) return true;
@@ -111,8 +120,8 @@ class AtomShield {
 
             const url = details.url;
 
-            // NUNCA bloquear dominios esenciales de YouTube
-            if (this._isYouTubeDomain(url)) {
+            // NUNCA bloquear dominios esenciales de YouTube O benchmarks
+            if (this._isYouTubeDomain(url) || this._isBenchmarkDomain(url)) {
                 callback({});
                 return;
             }
@@ -130,6 +139,7 @@ class AtomShield {
                     }
                     const { match } = this.engine.match(request);
                     if (match) {
+                        console.log('[AtomShield BLOCKED]', details.resourceType || 'other', url.substring(0, 120));
                         callback({ cancel: true });
                         return;
                     }
@@ -166,6 +176,12 @@ class AtomShield {
             if (!this.enabled) return;
             const url = wc.getURL();
             if (!url || url.startsWith('file:') || url.startsWith('about:') || url.startsWith('data:')) return;
+
+            // SKIP benchmarks (Speedometer) to measure engine performance, not extension overhead
+            if (this._isBenchmarkDomain(url)) {
+                console.log('Atom Shield: Skipping injection for benchmark:', url);
+                return;
+            }
 
             const script = this.getInjectionScript(url);
             wc.executeJavaScript(script).catch(e => {

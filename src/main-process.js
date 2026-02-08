@@ -3,9 +3,11 @@ const path = require('path');
 const AtomShield = require('./atom-shield');
 
 // =========================================================================
-// MODO ALTO RENDIMIENTO (Frankenstein Original)
+// STEALTH: Ocultar que somos Electron/automatizado
 // =========================================================================
-// app.commandLine.appendSwitch('disable-site-isolation-trials');
+// Este flag elimina window.navigator.webdriver y la barra "Chrome is being
+// controlled by automated test software". Es lo UNICO util del plugin stealth.
+app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 

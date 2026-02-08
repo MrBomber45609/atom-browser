@@ -379,6 +379,27 @@ function saveToHistory(url) {
   saveToHistoryDisk(history);
 }
 
+function renderHistory() {
+  const history = JSON.parse(localStorage.getItem("atom-history") || "[]");
+  historyList.innerHTML = history.length ? "" : '<div class="empty-state">Sin historial</div>';
+
+  history.forEach(h => {
+    const item = document.createElement("div");
+    item.className = "history-item";
+    const date = new Date(h.time);
+    const timeStr = date.toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    item.innerHTML = `
+      <span class="url">${h.url}</span>
+      <span class="time">${timeStr}</span>
+    `;
+    item.querySelector(".url").addEventListener("click", () => {
+      invoke("navigate", { url: h.url });
+      hideOverlay(historyOverlay);
+    });
+    historyList.appendChild(item);
+  });
+}
+
 // --- LOADING ---
 let loadingTimeout;
 
@@ -413,6 +434,19 @@ listen('url-changed', (event) => {
   updateTabInfo(id, url);
   saveToHistory(url);
   if (id === activeTabId) updateBookmarkStar();
+});
+
+// Pestanas creadas desde el backend (target=_blank)
+listen('tab-created-backend', (event) => {
+  const { id, url } = event.payload;
+  if (id && !tabs.has(id)) {
+    tabs.set(id, { url: url || 'about:blank', title: 'Nueva pestaña' });
+    const tabEl = createTabElement(id, true);
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tabsContainer.insertBefore(tabEl, btnNewTab);
+    activeTabId = id;
+    updateTabInfo(id, url);
+  }
 });
 
 // Atom Shield state sync (desde context menu del main process)

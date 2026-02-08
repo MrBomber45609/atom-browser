@@ -1,5 +1,5 @@
 {
-  "name": "atom-browser",
+  "name": "atom-browser-reparado",
   "private": true,
   "version": "0.1.0",
   "main": "src/main-process.js",
@@ -18,7 +18,7 @@
   },
   "build": {
     "appId": "com.atom.browser.electron",
-    "productName": "Atom",
+    "productName": "Atom Browser",
     "win": {
       "target": "nsis",
       "icon": "ico.png"

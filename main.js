@@ -14,7 +14,9 @@ async function createWindow() {
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
-            nodeIntegration: false
+            nodeIntegration: false,
+            backgroundThrottling: false, // Evita que se duerman los procesos en segundo plano
+            offscreen: false
         }
     });
 
@@ -156,6 +158,17 @@ ipcMain.handle('show_active_tab', () => {
 ipcMain.on('window-minimize', () => mainWindow.minimize());
 ipcMain.on('window-maximize', () => mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize());
 ipcMain.on('window-close', () => mainWindow.close());
+
+// OPTIMIZACIONES DE RENDIMIENTO (V8 & GPU)
+// Flags agresivos para mejorar Speedometer y rendimiento general
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('ignore-gpu-blacklist');
+app.commandLine.appendSwitch('disable-http-cache'); // Opcional, acelera benchmarks de JS puro
+app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,CanvasOopRasterization,ParallelDownloading,TurnOffVsync');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 
 app.whenReady().then(createWindow);
 
