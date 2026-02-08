@@ -427,34 +427,6 @@ pub mod network_blocker {
     // WHITELIST — Dominios necesarios para funcionalidad
     // ================================================================
 
-    // Dominios de YouTube/Google que NUNCA se bloquean cuando
-    // el usuario está en YouTube (necesarios para que el player funcione)
-    const YOUTUBE_ECOSYSTEM: &[&str] = &[
-        "youtube.com",
-        "youtu.be",
-        "ytimg.com",
-        "googlevideo.com",
-        "ggpht.com",
-        "googleusercontent.com",
-        "gstatic.com",
-        "google.com",
-        "googleapis.com",
-        "accounts.google.com",
-        "fonts.googleapis.com",
-        "fonts.gstatic.com",
-        "jnn-pa.googleapis.com",
-        "play.google.com",
-        "imasdk.googleapis.com",
-        // YouTube necesita que estos funcionen para no romper el player
-        "doubleclick.net",
-        "googlesyndication.com",
-        "googleadservices.com",
-        "googletagmanager.com",
-        "googletagservices.com",
-        "2mdn.net",
-        "fundingchoicesmessages.google.com",
-    ];
-
     // Dominios que SIEMPRE se whitelistean (en cualquier sitio)
     const ALWAYS_WHITELISTED: &[&str] = &[
         "accounts.google.com",
