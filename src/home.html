@@ -301,6 +301,16 @@
     const nameInput = document.getElementById('shortcut-name');
     const urlInput = document.getElementById('shortcut-url');
 
+    function escapeHTML(str) {
+      if (!str) return "";
+      return str.toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
     // Cargar atajos desde localStorage
     function loadShortcuts() {
       const shortcuts = JSON.parse(localStorage.getItem(SHORTCUTS_KEY) || '[]');
@@ -337,12 +347,14 @@
         shortcutEl.setAttribute('data-index', index);
 
         const favicon = getFavicon(shortcut.url);
+        const safeName = escapeHTML(shortcut.name);
+        const safeFavicon = escapeHTML(favicon);
 
         shortcutEl.innerHTML = `
           <div class="shortcut-icon">
-            <img src="${favicon}" alt="${shortcut.name}" onerror="this.style.display='none'; this.parentElement.textContent='🔗'">
+            <img src="${safeFavicon}" alt="${safeName}" onerror="this.style.display='none'; this.parentElement.textContent='🔗'">
           </div>
-          <div class="shortcut-title">${shortcut.name}</div>
+          <div class="shortcut-title">${safeName}</div>
           <button class="delete-btn" onclick="deleteShortcut(${index}); event.preventDefault(); event.stopPropagation();">×</button>
         `;
 

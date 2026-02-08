@@ -95,6 +95,16 @@ function debounce(func, wait) {
   };
 }
 
+function escapeHTML(str) {
+  if (!str) return "";
+  return str.toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // --- FAVICON PRIVADO (sin Google) ---
 function getFaviconUrl(url) {
   try {
@@ -499,8 +509,9 @@ function renderBookmarks() {
   bookmarks.forEach(b => {
     const item = document.createElement("div");
     item.className = "bookmark-item";
+    const safeTitle = escapeHTML(b.title || b.url);
     item.innerHTML = `
-      <span class="url">${b.title || b.url}</span>
+      <span class="url">${safeTitle}</span>
       <button class="delete-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     `;
     item.querySelector(".url").addEventListener("click", () => {
@@ -533,7 +544,7 @@ function renderHistory() {
     item.className = "history-item";
     const date = new Date(h.time);
     const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const safeUrl = h.url.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const safeUrl = escapeHTML(h.url);
     item.innerHTML = `
       <span class="url">${safeUrl}</span>
       <span class="time">${timeStr}</span>
@@ -645,7 +656,7 @@ function renderDownloads() {
     item.className = `download-item ${stateClass}`;
 
     const iconSvg = getFileIcon(d.filename);
-    const safeName = (d.filename || 'Descarga').replace(/</g, '&lt;');
+    const safeName = escapeHTML(d.filename || 'Descarga');
 
     item.innerHTML = `
       <div class="download-icon">${iconSvg}</div>
