@@ -1,4 +1,6 @@
 // Tauri APIs
+import { formatBytes } from './utils.js';
+
 // Tauri APIs - Wrapper setup
 const { invoke } = window.__TAURI__.core || { invoke: async () => console.warn('Tauri invoke not available') };
 const { listen } = window.__TAURI__.event || { listen: () => console.warn('Tauri listen not available') };
@@ -574,13 +576,6 @@ function updateDownloadBtn() {
   btnDownloads.classList.toggle("downloading", hasActive);
 }
 
-function formatBytes(bytes) {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
 
 function getFileIcon(filename) {
   const ext = (filename || '').split('.').pop().toLowerCase();
