@@ -34,23 +34,32 @@ async function createWindow() {
             contextIsolation: true,
             nodeIntegration: false,
             webviewTag: false,
-            backgroundThrottling: false
+            backgroundThrottling: false,
+            partition: 'persist:atom'
         }
     });
 
+    const ses = session.fromPartition('persist:atom');
     mainWindow.loadFile(path.join(__dirname, 'index.html'));
+
+    // Interceptar ventanas nuevas (target="_blank") en la UI principal
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        const tabId = createTab(url);
+        mainWindow.webContents.send('tab-created-backend', { id: tabId, url });
+        return { action: 'deny' };
+    });
 
     // ATOM SHIELD: inicializar motor de filtros + bloqueo de red
     try {
         await atomShield.init();
-        atomShield.enableNetworkBlocking(session.defaultSession);
+        atomShield.enableNetworkBlocking(ses);
         console.log("Atom Shield: ACTIVO");
     } catch (e) {
         console.error("Atom Shield init error:", e);
     }
 
     // Limpiar headers que delatan a Electron en peticiones a Google
-    session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    ses.webRequest.onBeforeSendHeaders((details, callback) => {
         const headers = { ...details.requestHeaders };
         // Eliminar cualquier referencia a Electron en los headers
         if (headers['User-Agent']) {
@@ -64,9 +73,51 @@ async function createWindow() {
     });
 
     // Permisos
-    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    ses.setPermissionRequestHandler((webContents, permission, callback) => {
         const allowedPermissions = ['media', 'fullscreen', 'autoplay'];
         callback(allowedPermissions.includes(permission));
+    });
+
+    // Gestor de Descargas
+    ses.on('will-download', (event, item, webContents) => {
+        const downloadId = Date.now().toString();
+        const filename = item.getFilename();
+
+        // Emitir inicio de descarga
+        if (!mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('download-started', {
+                id: downloadId,
+                filename: filename,
+                path: item.getSavePath()
+            });
+        }
+
+        item.on('updated', (event, state) => {
+            if (state === 'interrupted') {
+                console.log('Download is interrupted but can be resumed');
+            } else if (state === 'progressing') {
+                if (item.isPaused()) {
+                    console.log('Download is paused');
+                } else {
+                    if (!mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('download-progress', {
+                            id: downloadId,
+                            current: item.getReceivedBytes(),
+                            total: item.getTotalBytes()
+                        });
+                    }
+                }
+            }
+        });
+
+        item.once('done', (event, state) => {
+            if (!mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('download-finished', {
+                    id: downloadId,
+                    success: state === 'completed'
+                });
+            }
+        });
     });
 
     mainWindow.on('resize', () => {
@@ -95,10 +146,11 @@ function attachContextMenu(view) {
             label: atomShield.isEnabled() ? 'Atom Shield: ON' : 'Atom Shield: OFF',
             click: () => {
                 const newState = atomShield.toggle();
+                const ses = session.fromPartition('persist:atom');
                 if (newState) {
-                    atomShield.enableNetworkBlocking(session.defaultSession);
+                    atomShield.enableNetworkBlocking(ses);
                 } else {
-                    atomShield.disableNetworkBlocking(session.defaultSession);
+                    atomShield.disableNetworkBlocking(ses);
                 }
                 mainWindow.webContents.send('adblock-state', newState);
             }
@@ -117,7 +169,8 @@ function createTab(url) {
             sandbox: false, // Required for preload with electron modules
             preload: path.join(__dirname, 'shield-preload.js'),
             backgroundThrottling: false,
-            plugins: true
+            plugins: true,
+            partition: 'persist:atom'
         }
     });
 
@@ -138,6 +191,13 @@ function createTab(url) {
     }
 
     view.webContents.loadURL(targetUrl).catch(e => console.log('Error carga:', e));
+
+    // Interceptar ventanas nuevas (target="_blank") en las pestañas
+    view.webContents.setWindowOpenHandler(({ url }) => {
+        const tabId = createTab(url);
+        mainWindow.webContents.send('tab-created-backend', { id: tabId, url });
+        return { action: 'deny' };
+    });
 
     const handleUrlUpdate = (e, newUrl) => {
         if (!mainWindow.isDestroyed()) mainWindow.webContents.send('url-changed', { id: tabId, url: newUrl });
@@ -171,10 +231,11 @@ ipcMain.handle('go_forward', () => { if (activeTabId) views.get(activeTabId).web
 // Toggle adblock desde frontend
 ipcMain.handle('toggle-adblock', () => {
     const newState = atomShield.toggle();
+    const ses = session.fromPartition('persist:atom');
     if (newState) {
-        atomShield.enableNetworkBlocking(session.defaultSession);
+        atomShield.enableNetworkBlocking(ses);
     } else {
-        atomShield.disableNetworkBlocking(session.defaultSession);
+        atomShield.disableNetworkBlocking(ses);
     }
     return newState;
 });

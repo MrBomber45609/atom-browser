@@ -17,7 +17,7 @@ const invoke = async (cmd, args) => {
 
 // 2. Wrapper para 'listen': Adapta los eventos de Electron al formato { payload } de Tauri
 const listen = (channel, callback) => {
-  electron.on(channel, (data) => {
+  return electron.on(channel, (data) => {
     // Envolvemos la data para que tu código existente no se rompa
     callback({ payload: data });
   });
